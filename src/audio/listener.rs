@@ -7,8 +7,8 @@ use std::sync::Mutex;
 use std::time::Duration;
 use tracing::{debug, error, info, warn};
 
-use super::controller::DeviceController;
 use super::AudioDevice;
+use super::controller::DeviceController;
 use crate::config::Config;
 use crate::notifications::{NotificationManager, SwitchReason};
 use crate::priority::DevicePriorityManager;
@@ -52,7 +52,7 @@ impl CoreAudioListener {
 
         // Initialize with current devices to avoid false notifications on startup
         let initial_devices = controller.enumerate_devices().unwrap_or_default();
-        
+
         Ok(Self {
             controller,
             priority_manager,
@@ -173,7 +173,10 @@ impl CoreAudioListener {
         // Get current available devices
         match self.controller.enumerate_devices() {
             Ok(current_devices) => {
-                info!("Device list updated, found {} devices", current_devices.len());
+                info!(
+                    "Device list updated, found {} devices",
+                    current_devices.len()
+                );
 
                 // Check for device connections/disconnections and send notifications
                 if let Ok(mut previous_devices) = self.previous_devices.lock() {
@@ -189,9 +192,14 @@ impl CoreAudioListener {
 
                     // Find disconnected devices
                     for prev_device in &*previous_devices {
-                        if !current_devices.iter().any(|curr| curr.uid == prev_device.uid) {
+                        if !current_devices
+                            .iter()
+                            .any(|curr| curr.uid == prev_device.uid)
+                        {
                             // Device was disconnected
-                            if let Err(e) = self.notification_manager.device_disconnected(prev_device) {
+                            if let Err(e) =
+                                self.notification_manager.device_disconnected(prev_device)
+                            {
                                 warn!("Failed to send device disconnected notification: {}", e);
                             }
                         }
@@ -223,22 +231,25 @@ impl CoreAudioListener {
                             info!("Switching to output device: {}", best_output.name);
                             match self.controller.set_default_output_device(&best_output.name) {
                                 Ok(()) => {
-                                    info!("Successfully switched to output device: {}", best_output.name);
+                                    info!(
+                                        "Successfully switched to output device: {}",
+                                        best_output.name
+                                    );
                                     // Send notification for successful switch
-                                    if let Err(e) = self.notification_manager.device_switched(
-                                        &best_output,
-                                        SwitchReason::HigherPriority
-                                    ) {
+                                    if let Err(e) = self
+                                        .notification_manager
+                                        .device_switched(&best_output, SwitchReason::HigherPriority)
+                                    {
                                         warn!("Failed to send device switched notification: {}", e);
                                     }
                                 }
                                 Err(e) => {
                                     error!("Failed to switch output device: {}", e);
                                     // Send notification for failed switch
-                                    if let Err(e) = self.notification_manager.switch_failed(
-                                        &best_output.name,
-                                        &e.to_string()
-                                    ) {
+                                    if let Err(e) = self
+                                        .notification_manager
+                                        .switch_failed(&best_output.name, &e.to_string())
+                                    {
                                         warn!("Failed to send switch failed notification: {}", e);
                                     }
                                 }
@@ -253,22 +264,25 @@ impl CoreAudioListener {
                             info!("Switching to input device: {}", best_input.name);
                             match self.controller.set_default_input_device(&best_input.name) {
                                 Ok(()) => {
-                                    info!("Successfully switched to input device: {}", best_input.name);
+                                    info!(
+                                        "Successfully switched to input device: {}",
+                                        best_input.name
+                                    );
                                     // Send notification for successful switch
-                                    if let Err(e) = self.notification_manager.device_switched(
-                                        &best_input,
-                                        SwitchReason::HigherPriority
-                                    ) {
+                                    if let Err(e) = self
+                                        .notification_manager
+                                        .device_switched(&best_input, SwitchReason::HigherPriority)
+                                    {
                                         warn!("Failed to send device switched notification: {}", e);
                                     }
                                 }
                                 Err(e) => {
                                     error!("Failed to switch input device: {}", e);
                                     // Send notification for failed switch
-                                    if let Err(e) = self.notification_manager.switch_failed(
-                                        &best_input.name,
-                                        &e.to_string()
-                                    ) {
+                                    if let Err(e) = self
+                                        .notification_manager
+                                        .switch_failed(&best_input.name, &e.to_string())
+                                    {
                                         warn!("Failed to send switch failed notification: {}", e);
                                     }
                                 }

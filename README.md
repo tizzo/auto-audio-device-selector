@@ -11,7 +11,8 @@ A Rust-based macOS audio device monitor that automatically switches to preferred
 - **Service Management**: Install as macOS LaunchAgent for automatic startup and background operation
 - **Enhanced Logging**: Daily log rotation, JSON output, console and file logging with cleanup utilities
 - **Manual Device Control**: Command-line interface for manual device switching and testing
-- **Flexible Configuration**: TOML-based configuration with hot-reload support
+- **Flexible Configuration**: TOML-based configuration with hot-reload support via SIGHUP signal
+- **Notification System**: macOS Notification Center integration for device changes and switching events
 - **Graceful Shutdown**: Proper signal handling for clean service lifecycle management
 - **Cross-platform Architecture**: Built with cpal for future extensibility while leveraging macOS-specific CoreAudio APIs
 
@@ -286,6 +287,11 @@ audio-device-monitor [OPTIONS] [COMMAND]
   audio-device-monitor cleanup-logs --keep-days 30
   ```
 
+- **`test-notification`** - Test notification system
+  ```bash
+  audio-device-monitor test-notification
+  ```
+
 ## Service Management
 
 The application supports installation as a macOS LaunchAgent for automatic startup and background operation.
@@ -342,10 +348,91 @@ audio-device-monitor service
 
 # Features:
 # - Graceful shutdown on SIGTERM/SIGINT
-# - Configuration reload on SIGHUP (planned)
+# - Configuration hot-reload on SIGHUP
 # - Better error handling and recovery
 # - Structured logging with metadata
 ```
+
+### Hot Configuration Reload
+
+The service supports hot reloading of configuration without restart:
+
+```bash
+# Find the service process ID
+ps aux | grep audio-device-monitor
+
+# Send reload signal (replace PID with actual process ID)
+kill -HUP <PID>
+
+# Or if installed as a service
+launchctl kill -HUP system/com.audiodevicemonitor.daemon
+```
+
+**What gets reloaded:**
+- Device priority weights and rules
+- Notification preferences
+- General configuration settings
+- All matching patterns and device rules
+
+**The reload process:**
+1. Receives SIGHUP signal
+2. Stops current audio monitoring
+3. Reloads configuration from disk
+4. Restarts monitoring with new settings
+5. Logs the successful reload
+
+## Notification System
+
+The application integrates with macOS Notification Center to provide real-time feedback about device changes and switching events.
+
+### Notification Types
+
+1. **Device Connected** - Shows when audio devices come online
+   - Displays device name and type (🎤 Input, 🔊 Output, 🎧 Input/Output)
+   - Helps track device availability
+
+2. **Device Disconnected** - Shows when audio devices go offline
+   - Alerts when preferred devices become unavailable
+   - Useful for troubleshooting connectivity issues
+
+3. **Device Switched** - Shows when automatic switching occurs
+   - Indicates which device was selected and why
+   - Includes switching reason (higher priority, previous unavailable)
+
+4. **Switch Failed** - Shows when device switching fails
+   - Displays error information for troubleshooting
+   - Helps identify device conflicts or permission issues
+
+### Notification Configuration
+
+Configure notifications in your TOML configuration file:
+
+```toml
+[notifications]
+# Show notifications when devices are added/removed
+show_device_changes = true
+
+# Show notifications when automatic switching occurs
+show_switching_actions = true
+```
+
+### Testing Notifications
+
+```bash
+# Test the notification system
+audio-device-monitor test-notification
+
+# Run with notifications enabled
+audio-device-monitor service
+# (Try plugging/unplugging devices to see notifications)
+```
+
+### Notification Examples
+
+- **"🎤 AirPods Pro is now available"** - Device connected
+- **"🔊 USB Speakers is no longer available"** - Device disconnected  
+- **"🔊 Output switched to AirPods Pro (higher priority)"** - Automatic switching
+- **"Failed to switch to Blue Yeti: Device in use"** - Switch failure
 
 ## Logging System
 
@@ -520,6 +607,7 @@ cargo build --release
 - **Phase 3**: Priority management system with weighted device selection and intelligent fallbacks
 - **Phase 4**: Automatic device switching with CoreAudio APIs and real-time event handling
 - **Phase 5**: Background service infrastructure, enhanced logging, and service installation
+- **Phase 6**: macOS Notification Center integration and hot configuration reload
 
 ### 🚧 Current Capabilities
 
@@ -529,11 +617,12 @@ cargo build --release
 - **Manual Device Control**: ✅ Command-line switching for testing and manual control
 - **Priority-based Selection**: ✅ Configurable weight system with multiple matching modes
 - **Signal Handling**: ✅ Graceful shutdown and service lifecycle management
+- **Configuration Hot-reload**: ✅ Dynamic config changes via SIGHUP signal without service restart
+- **Notification System**: ✅ macOS Notification Center integration for device events
 
 ### 📋 Planned Features
 
 - **System Tray Integration**: macOS menu bar integration for easy access
-- **Configuration Hot-reload**: Dynamic config changes without service restart
 - **GUI Configuration Interface**: Visual configuration editor
 - **Advanced Device Matching**: Full regex support and complex matching rules
 - **Statistics and Usage Reporting**: Device usage analytics and switching history

@@ -3,19 +3,36 @@ use signal_hook::consts::signal::*;
 use signal_hook_tokio::Signals;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
+use tokio::sync::mpsc;
 use tokio_stream::StreamExt;
 use tracing::{info, warn};
 
-/// Handles system signals for graceful shutdown
+/// Signal types that can be received
+#[derive(Debug, Clone, Copy)]
+pub enum SignalType {
+    Shutdown,
+    Reload,
+}
+
+/// Handles system signals for graceful shutdown and configuration reload
 #[derive(Clone)]
 pub struct SignalHandler {
     shutdown_flag: Arc<AtomicBool>,
+    signal_sender: Option<mpsc::UnboundedSender<SignalType>>,
 }
 
 impl SignalHandler {
     pub fn new() -> Self {
         Self {
             shutdown_flag: Arc::new(AtomicBool::new(false)),
+            signal_sender: None,
+        }
+    }
+
+    pub fn with_sender(signal_sender: mpsc::UnboundedSender<SignalType>) -> Self {
+        Self {
+            shutdown_flag: Arc::new(AtomicBool::new(false)),
+            signal_sender: Some(signal_sender),
         }
     }
 
@@ -38,12 +55,26 @@ impl SignalHandler {
                         signal
                     );
                     self.shutdown_flag.store(true, Ordering::Relaxed);
+
+                    // Send shutdown signal if sender is available
+                    if let Some(sender) = &self.signal_sender {
+                        let _ = sender.send(SignalType::Shutdown);
+                    }
                     break;
                 }
                 SIGHUP => {
                     info!("Received SIGHUP signal, reloading configuration");
-                    // TODO: Implement configuration reload
-                    warn!("Configuration reload not yet implemented");
+
+                    // Send reload signal if sender is available
+                    if let Some(sender) = &self.signal_sender {
+                        if let Err(e) = sender.send(SignalType::Reload) {
+                            warn!("Failed to send reload signal: {}", e);
+                        } else {
+                            info!("Configuration reload signal sent");
+                        }
+                    } else {
+                        warn!("No signal receiver configured, reload request ignored");
+                    }
                 }
                 _ => {
                     warn!("Received unexpected signal: {}", signal);

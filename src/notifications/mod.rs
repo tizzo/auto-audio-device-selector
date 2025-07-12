@@ -37,7 +37,7 @@ impl NotificationManager {
         let body = format!("{} {} is now available", device_type, device.name);
 
         self.send_notification(title, &body, NotificationType::DeviceChange)?;
-        
+
         info!("Sent device connected notification for: {}", device.name);
         Ok(())
     }
@@ -58,7 +58,7 @@ impl NotificationManager {
         let body = format!("{} {} is no longer available", device_type, device.name);
 
         self.send_notification(title, &body, NotificationType::DeviceChange)?;
-        
+
         info!("Sent device disconnected notification for: {}", device.name);
         Ok(())
     }
@@ -78,10 +78,16 @@ impl NotificationManager {
         let title = "Audio Device Switched";
         let body = match reason {
             SwitchReason::HigherPriority => {
-                format!("{} switched to {} (higher priority)", device_type, device.name)
+                format!(
+                    "{} switched to {} (higher priority)",
+                    device_type, device.name
+                )
             }
             SwitchReason::PreviousUnavailable => {
-                format!("{} switched to {} (previous device unavailable)", device_type, device.name)
+                format!(
+                    "{} switched to {} (previous device unavailable)",
+                    device_type, device.name
+                )
             }
             SwitchReason::Manual => {
                 format!("{} manually switched to {}", device_type, device.name)
@@ -89,8 +95,11 @@ impl NotificationManager {
         };
 
         self.send_notification(title, &body, NotificationType::SwitchAction)?;
-        
-        info!("Sent device switched notification: {} -> {}", device_type, device.name);
+
+        info!(
+            "Sent device switched notification: {} -> {}",
+            device_type, device.name
+        );
         Ok(())
     }
 
@@ -101,16 +110,21 @@ impl NotificationManager {
         }
 
         let title = "Audio Device Switch Failed";
-        let body = format!("Failed to switch to {}: {}", device_name, error);
+        let body = format!("Failed to switch to {device_name}: {error}");
 
         self.send_notification(title, &body, NotificationType::Error)?;
-        
+
         warn!("Sent switch failed notification for: {}", device_name);
         Ok(())
     }
 
     /// Send a generic system notification
-    fn send_notification(&self, title: &str, body: &str, notification_type: NotificationType) -> Result<()> {
+    fn send_notification(
+        &self,
+        title: &str,
+        body: &str,
+        notification_type: NotificationType,
+    ) -> Result<()> {
         debug!("Sending notification: {} - {}", title, body);
 
         let mut notification = Notification::new();
@@ -148,23 +162,28 @@ impl NotificationManager {
     }
 
     /// Check if notifications are enabled
+    #[allow(dead_code)]
     pub fn is_enabled(&self) -> bool {
         self.enabled
     }
 
     /// Enable or disable notifications
+    #[allow(dead_code)]
     pub fn set_enabled(&mut self, enabled: bool) {
         self.enabled = enabled;
-        info!("Notifications {}", if enabled { "enabled" } else { "disabled" });
+        info!(
+            "Notifications {}",
+            if enabled { "enabled" } else { "disabled" }
+        );
     }
 
     /// Test notification (for debugging)
     pub fn test_notification(&self) -> Result<()> {
         let title = "Audio Device Monitor";
         let body = "Notification system is working correctly! 🎵";
-        
+
         self.send_notification(title, body, NotificationType::DeviceChange)?;
-        
+
         info!("Sent test notification");
         Ok(())
     }
@@ -173,17 +192,18 @@ impl NotificationManager {
 /// Types of notifications for different styling/sounds
 #[derive(Debug, Clone)]
 enum NotificationType {
-    DeviceChange,  // Device connected/disconnected
-    SwitchAction,  // Automatic switching occurred
-    Error,         // Something went wrong
+    DeviceChange, // Device connected/disconnected
+    SwitchAction, // Automatic switching occurred
+    Error,        // Something went wrong
 }
 
 /// Reasons for device switching (for notification context)
 #[derive(Debug, Clone)]
+#[allow(dead_code)] // All variants kept for API completeness
 pub enum SwitchReason {
-    HigherPriority,        // A higher priority device became available
-    PreviousUnavailable,   // Previous device became unavailable
-    Manual,                // User manually switched
+    HigherPriority,      // A higher priority device became available
+    PreviousUnavailable, // Previous device became unavailable
+    Manual,              // User manually switched
 }
 
 impl Default for NotificationManager {

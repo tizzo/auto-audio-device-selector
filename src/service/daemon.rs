@@ -1,10 +1,11 @@
 use anyhow::Result;
 use std::path::PathBuf;
 use std::time::Duration;
+use tokio::sync::mpsc;
 use tokio::time::sleep;
 use tracing::{error, info, warn};
 
-use super::signals::SignalHandler;
+use super::signals::{SignalHandler, SignalType};
 use crate::audio::AudioDeviceMonitor;
 use crate::config::Config;
 
@@ -32,10 +33,15 @@ impl ServiceManager {
         self.monitor = Some(AudioDeviceMonitor::new(self.config.clone())?);
         let monitor = self.monitor.as_ref().unwrap();
 
-        // Start signal handling in a separate task
+        // Create signal channel
+        let (signal_tx, mut signal_rx) = mpsc::unbounded_channel::<SignalType>();
+
+        // Create signal handler with sender
+        self.signal_handler = SignalHandler::with_sender(signal_tx);
         let signal_handler = self.signal_handler.clone();
         let shutdown_flag = signal_handler.shutdown_flag();
 
+        // Start signal handling in a separate task
         tokio::spawn(async move {
             if let Err(e) = signal_handler.listen_for_signals().await {
                 error!("Signal handler error: {}", e);
@@ -49,14 +55,34 @@ impl ServiceManager {
 
         // Main service loop
         loop {
-            // Check for shutdown signal
-            if shutdown_flag.load(std::sync::atomic::Ordering::Relaxed) {
-                info!("Shutdown signal received, stopping service");
-                break;
+            tokio::select! {
+                // Check for signals
+                signal = signal_rx.recv() => {
+                    match signal {
+                        Some(SignalType::Shutdown) => {
+                            info!("Shutdown signal received, stopping service");
+                            break;
+                        }
+                        Some(SignalType::Reload) => {
+                            info!("Reload signal received, reloading configuration");
+                            if let Err(e) = self.reload_config(None).await {
+                                error!("Failed to reload configuration: {}", e);
+                            }
+                        }
+                        None => {
+                            warn!("Signal channel closed");
+                            break;
+                        }
+                    }
+                }
+                // Check for shutdown via flag (fallback)
+                _ = sleep(Duration::from_millis(100)) => {
+                    if shutdown_flag.load(std::sync::atomic::Ordering::Relaxed) {
+                        info!("Shutdown flag set, stopping service");
+                        break;
+                    }
+                }
             }
-
-            // Sleep for a short interval to avoid busy waiting
-            sleep(Duration::from_millis(100)).await;
         }
 
         // Cleanup
@@ -90,7 +116,6 @@ impl ServiceManager {
     }
 
     /// Reload configuration (for SIGHUP support)
-    #[allow(dead_code)]
     pub async fn reload_config(&mut self, config_path: Option<&str>) -> Result<()> {
         info!("Reloading configuration");
 

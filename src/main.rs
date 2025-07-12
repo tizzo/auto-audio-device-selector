@@ -371,15 +371,15 @@ fn cleanup_logs(keep_days: u64) -> Result<()> {
 
 fn test_notification() -> Result<()> {
     info!("Testing notification system");
-    
+
     let config = Config::default();
     let notification_manager = NotificationManager::new(&config);
-    
+
     println!("Sending test notification...");
     notification_manager.test_notification()?;
-    
+
     println!("✓ Test notification sent successfully");
     println!("  Check your Notification Center to see if it appeared");
-    
+
     Ok(())
 }
