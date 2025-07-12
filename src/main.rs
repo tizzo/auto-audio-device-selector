@@ -1,15 +1,18 @@
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 use tracing::info;
-use tracing_subscriber;
 
 mod audio;
 mod config;
+mod logging;
 mod priority;
+mod service;
 mod system;
 
 use audio::AudioDeviceMonitor;
 use config::Config;
+use logging::{LoggingConfig, cleanup_old_logs, get_default_log_dir, initialize_logging};
+use service::{ServiceManager, daemon::ServiceInstaller};
 
 #[derive(Parser)]
 #[command(name = "audio-device-monitor")]
@@ -26,6 +29,18 @@ struct Cli {
     /// Configuration file path
     #[arg(short, long)]
     config: Option<String>,
+
+    /// Enable JSON logging format
+    #[arg(long)]
+    json_logs: bool,
+
+    /// Disable file logging (console only)
+    #[arg(long)]
+    no_file_logs: bool,
+
+    /// Custom log directory
+    #[arg(long)]
+    log_dir: Option<String>,
 }
 
 #[derive(Subcommand)]
@@ -53,17 +68,38 @@ enum Commands {
         #[arg(short, long)]
         input: bool,
     },
+    /// Install system service
+    InstallService,
+    /// Uninstall system service
+    UninstallService,
+    /// Run as a background service (enhanced daemon)
+    Service,
+    /// Clean up old log files
+    CleanupLogs {
+        /// Number of days to keep (default: 30)
+        #[arg(short, long, default_value = "30")]
+        keep_days: u64,
+    },
 }
 
 #[tokio::main]
 async fn main() -> Result<()> {
     let cli = Cli::parse();
 
-    // Initialize logging
-    let log_level = if cli.verbose { "debug" } else { "info" };
-    tracing_subscriber::fmt()
-        .with_env_filter(format!("audio_device_monitor={}", log_level))
-        .init();
+    // Initialize enhanced logging
+    let logging_config = LoggingConfig {
+        level: if cli.verbose {
+            tracing::Level::DEBUG
+        } else {
+            tracing::Level::INFO
+        },
+        file_output: !cli.no_file_logs,
+        console_output: true,
+        log_dir: cli.log_dir.as_ref().map(|d| d.into()),
+        json_format: cli.json_logs,
+    };
+
+    let _guard = initialize_logging(logging_config)?;
 
     info!("Starting audio device monitor");
 
@@ -90,6 +126,18 @@ async fn main() -> Result<()> {
         }
         Some(Commands::Switch { device, input }) => {
             switch_device(&device, input).await?;
+        }
+        Some(Commands::InstallService) => {
+            install_service()?;
+        }
+        Some(Commands::UninstallService) => {
+            uninstall_service()?;
+        }
+        Some(Commands::Service) => {
+            run_service(config).await?;
+        }
+        Some(Commands::CleanupLogs { keep_days }) => {
+            cleanup_logs(keep_days)?;
         }
         None => {
             // Default behavior - run daemon if no command specified
@@ -253,6 +301,63 @@ async fn switch_device(device_name: &str, is_input: bool) -> Result<()> {
             return Err(e);
         }
     }
+
+    Ok(())
+}
+
+fn install_service() -> Result<()> {
+    info!("Installing system service");
+
+    ServiceInstaller::install_launch_agent()?;
+
+    println!("✓ Audio device monitor service installed successfully");
+    println!("  Service will start automatically on login");
+    println!(
+        "  To start now: launchctl load ~/Library/LaunchAgents/com.audiodevicemonitor.daemon.plist"
+    );
+    println!("  To check status: launchctl list | grep audiodevicemonitor");
+
+    Ok(())
+}
+
+fn uninstall_service() -> Result<()> {
+    info!("Uninstalling system service");
+
+    ServiceInstaller::uninstall_launch_agent()?;
+
+    println!("✓ Audio device monitor service uninstalled successfully");
+    println!(
+        "  To stop if running: launchctl unload ~/Library/LaunchAgents/com.audiodevicemonitor.daemon.plist"
+    );
+
+    Ok(())
+}
+
+async fn run_service(config: Config) -> Result<()> {
+    info!("Starting background service mode");
+
+    let mut service_manager = ServiceManager::new(config);
+
+    println!("Audio device monitor service starting...");
+    println!("  Enhanced signal handling enabled");
+    println!("  Send SIGTERM or SIGINT to stop gracefully");
+    println!("  Send SIGHUP to reload configuration");
+
+    service_manager.start().await?;
+
+    println!("Service stopped");
+    Ok(())
+}
+
+fn cleanup_logs(keep_days: u64) -> Result<()> {
+    info!("Cleaning up old log files (keeping {} days)", keep_days);
+
+    let log_dir = get_default_log_dir()?;
+    cleanup_old_logs(&log_dir, keep_days)?;
+
+    println!("✓ Log cleanup completed");
+    println!("  Log directory: {}", log_dir.display());
+    println!("  Kept files newer than {} days", keep_days);
 
     Ok(())
 }
