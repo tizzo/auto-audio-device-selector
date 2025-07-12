@@ -44,6 +44,15 @@ enum Commands {
     CheckConfig,
     /// Show current default devices
     ShowDefault,
+    /// Switch to a specific device
+    Switch {
+        /// Device name to switch to
+        #[arg(short, long)]
+        device: String,
+        /// Switch input device instead of output
+        #[arg(short, long)]
+        input: bool,
+    },
 }
 
 #[tokio::main]
@@ -79,6 +88,9 @@ async fn main() -> Result<()> {
         Some(Commands::ShowDefault) => {
             show_default_devices().await?;
         }
+        Some(Commands::Switch { device, input }) => {
+            switch_device(&device, input).await?;
+        }
         None => {
             // Default behavior - run daemon if no command specified
             info!("No command specified, running in daemon mode");
@@ -91,29 +103,29 @@ async fn main() -> Result<()> {
 
 async fn list_devices(verbose: bool) -> Result<()> {
     info!("Listing audio devices");
-    
+
     let controller = audio::controller::DeviceController::new()?;
     let devices = controller.enumerate_devices()?;
-    
+
     println!("Available audio devices:");
     if devices.is_empty() {
         println!("  No audio devices found!");
         return Ok(());
     }
-    
+
     for (i, device) in devices.iter().enumerate() {
         println!("  {}. {}", i + 1, device);
     }
-    
+
     // Show default devices
     if let Ok(Some(default_input)) = controller.get_default_input_device() {
         println!("Default input: {}", default_input.name);
     }
-    
+
     if let Ok(Some(default_output)) = controller.get_default_output_device() {
         println!("Default output: {}", default_output.name);
     }
-    
+
     if verbose {
         println!("\n--- Detailed Device Information ---");
         for device in &devices {
@@ -126,7 +138,7 @@ async fn list_devices(verbose: bool) -> Result<()> {
             }
         }
     }
-    
+
     Ok(())
 }
 
@@ -189,19 +201,57 @@ async fn show_default_devices() -> Result<()> {
     info!("Showing current default devices");
 
     let controller = audio::controller::DeviceController::new()?;
-    
+
     println!("Current default devices:");
-    
+
     if let Ok(Some(default_input)) = controller.get_default_input_device() {
         println!("  Input:  {}", default_input);
     } else {
         println!("  Input:  None available");
     }
-    
+
     if let Ok(Some(default_output)) = controller.get_default_output_device() {
         println!("  Output: {}", default_output);
     } else {
         println!("  Output: None available");
+    }
+
+    Ok(())
+}
+
+async fn switch_device(device_name: &str, is_input: bool) -> Result<()> {
+    info!(
+        "Manual device switch requested: {} ({})",
+        device_name,
+        if is_input { "input" } else { "output" }
+    );
+
+    let controller = audio::controller::DeviceController::new()?;
+
+    println!(
+        "Switching {} device to: {}",
+        if is_input { "input" } else { "output" },
+        device_name
+    );
+
+    let result = if is_input {
+        controller.set_default_input_device(device_name)
+    } else {
+        controller.set_default_output_device(device_name)
+    };
+
+    match result {
+        Ok(()) => {
+            println!(
+                "✓ Successfully switched {} device to: {}",
+                if is_input { "input" } else { "output" },
+                device_name
+            );
+        }
+        Err(e) => {
+            println!("✗ Failed to switch device: {}", e);
+            return Err(e);
+        }
     }
 
     Ok(())
