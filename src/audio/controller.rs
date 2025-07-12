@@ -12,19 +12,23 @@ pub struct DeviceController {
 impl DeviceController {
     pub fn new() -> Result<Self> {
         let host = cpal::default_host();
-        info!("Initialized audio device controller with host: {}", host.id().name());
-        
+        info!(
+            "Initialized audio device controller with host: {}",
+            host.id().name()
+        );
+
         Ok(Self { host })
     }
-    
+
     pub fn enumerate_devices(&self) -> Result<Vec<AudioDevice>> {
         let mut devices = Vec::new();
-        
+
         // Get input devices
         match self.host.input_devices() {
             Ok(input_devices) => {
                 for device in input_devices {
-                    if let Ok(audio_device) = self.device_to_audio_device(device, DeviceType::Input) {
+                    if let Ok(audio_device) = self.device_to_audio_device(device, DeviceType::Input)
+                    {
                         devices.push(audio_device);
                     }
                 }
@@ -33,12 +37,14 @@ impl DeviceController {
                 warn!("Failed to enumerate input devices: {}", e);
             }
         }
-        
+
         // Get output devices
         match self.host.output_devices() {
             Ok(output_devices) => {
                 for device in output_devices {
-                    if let Ok(audio_device) = self.device_to_audio_device(device, DeviceType::Output) {
+                    if let Ok(audio_device) =
+                        self.device_to_audio_device(device, DeviceType::Output)
+                    {
                         devices.push(audio_device);
                     }
                 }
@@ -47,11 +53,11 @@ impl DeviceController {
                 warn!("Failed to enumerate output devices: {}", e);
             }
         }
-        
+
         info!("Enumerated {} audio devices", devices.len());
         Ok(devices)
     }
-    
+
     pub fn get_default_input_device(&self) -> Result<Option<AudioDevice>> {
         match self.host.default_input_device() {
             Some(device) => {
@@ -65,7 +71,7 @@ impl DeviceController {
             }
         }
     }
-    
+
     pub fn get_default_output_device(&self) -> Result<Option<AudioDevice>> {
         match self.host.default_output_device() {
             Some(device) => {
@@ -79,7 +85,7 @@ impl DeviceController {
             }
         }
     }
-    
+
     pub fn get_device_info(&self, device: &AudioDevice) -> Result<DeviceInfo> {
         // This will be expanded with more detailed device information
         Ok(DeviceInfo {
@@ -91,14 +97,20 @@ impl DeviceController {
             is_default: device.is_default,
         })
     }
-    
+
     // Convert cpal::Device to our AudioDevice
-    fn device_to_audio_device(&self, device: Device, device_type: DeviceType) -> Result<AudioDevice> {
-        let name = device.name().unwrap_or_else(|_| "Unknown Device".to_string());
-        
+    fn device_to_audio_device(
+        &self,
+        device: Device,
+        device_type: DeviceType,
+    ) -> Result<AudioDevice> {
+        let name = device
+            .name()
+            .unwrap_or_else(|_| "Unknown Device".to_string());
+
         // For now, use the name as the ID. Later we'll use proper device UIDs
         let id = name.clone();
-        
+
         Ok(AudioDevice::new(id, name, device_type))
     }
 }

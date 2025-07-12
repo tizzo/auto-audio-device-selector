@@ -1,7 +1,9 @@
-pub mod device;
-pub mod monitor;
 pub mod controller;
+pub mod device;
+pub mod listener;
+pub mod monitor;
 
-pub use device::{AudioDevice, DeviceInfo, DeviceType};
-pub use monitor::AudioDeviceMonitor;
 pub use controller::DeviceController;
+pub use device::{AudioDevice, DeviceInfo, DeviceType};
+pub use listener::CoreAudioListener;
+pub use monitor::AudioDeviceMonitor;

@@ -134,6 +134,7 @@ dependencies = [
  "clap",
  "core-foundation",
  "core-foundation-sys 0.2.3",
+ "coreaudio-sys",
  "cpal",
  "dirs",
  "libc",

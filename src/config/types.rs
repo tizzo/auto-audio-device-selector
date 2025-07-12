@@ -8,13 +8,13 @@ use tracing::{debug, info, warn};
 pub struct Config {
     #[serde(default)]
     pub general: GeneralConfig,
-    
+
     #[serde(default)]
     pub notifications: NotificationConfig,
-    
+
     #[serde(default)]
     pub output_devices: Vec<DeviceRule>,
-    
+
     #[serde(default)]
     pub input_devices: Vec<DeviceRule>,
 }
@@ -112,64 +112,65 @@ impl Config {
             Some(path) => PathBuf::from(path),
             None => Self::default_config_path()?,
         };
-        
+
         debug!("Loading configuration from: {}", path.display());
-        
+
         if !path.exists() {
             info!("Configuration file not found, creating default configuration");
             return Self::create_default_config(&path);
         }
-        
+
         let config_content = fs::read_to_string(&path)
             .with_context(|| format!("Failed to read configuration file: {}", path.display()))?;
-        
+
         let config: Config = toml::from_str(&config_content)
             .with_context(|| format!("Failed to parse configuration file: {}", path.display()))?;
-        
+
         info!("Configuration loaded successfully");
         Ok(config)
     }
-    
+
     pub fn save(&self, config_path: Option<&str>) -> Result<()> {
         let path = match config_path {
             Some(path) => PathBuf::from(path),
             None => Self::default_config_path()?,
         };
-        
+
         // Create parent directories if they don't exist
         if let Some(parent) = path.parent() {
-            fs::create_dir_all(parent)
-                .with_context(|| format!("Failed to create config directory: {}", parent.display()))?;
+            fs::create_dir_all(parent).with_context(|| {
+                format!("Failed to create config directory: {}", parent.display())
+            })?;
         }
-        
-        let config_content = toml::to_string_pretty(self)
-            .context("Failed to serialize configuration")?;
-        
+
+        let config_content =
+            toml::to_string_pretty(self).context("Failed to serialize configuration")?;
+
         fs::write(&path, config_content)
             .with_context(|| format!("Failed to write configuration file: {}", path.display()))?;
-        
+
         info!("Configuration saved to: {}", path.display());
         Ok(())
     }
-    
+
     fn default_config_path() -> Result<PathBuf> {
-        let home_dir = dirs::home_dir()
-            .context("Failed to get home directory")?;
-        
+        let home_dir = dirs::home_dir().context("Failed to get home directory")?;
+
         Ok(home_dir.join(".config/audio-device-monitor/config.toml"))
     }
-    
+
     fn create_default_config(path: &PathBuf) -> Result<Self> {
         let config = Config::default();
-        
+
         // Create parent directories
         if let Some(parent) = path.parent() {
-            fs::create_dir_all(parent)
-                .with_context(|| format!("Failed to create config directory: {}", parent.display()))?;
+            fs::create_dir_all(parent).with_context(|| {
+                format!("Failed to create config directory: {}", parent.display())
+            })?;
         }
-        
+
         config.save(Some(path.to_str().unwrap()))?;
-        
+
         info!("Created default configuration file: {}", path.display());
         Ok(config)
     }
@@ -180,7 +181,7 @@ impl DeviceRule {
         if !self.enabled {
             return false;
         }
-        
+
         match self.match_type {
             MatchType::Exact => device_name == self.name,
             MatchType::Contains => device_name.contains(&self.name),

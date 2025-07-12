@@ -1,7 +1,7 @@
-pub mod config;
 pub mod audio;
-pub mod system;
+pub mod config;
 pub mod priority;
+pub mod system;
 
-pub use config::Config;
 pub use audio::AudioDeviceMonitor;
+pub use config::Config;

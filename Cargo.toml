@@ -11,7 +11,7 @@ categories = ["multimedia::audio", "os::macos-apis"]
 
 [dependencies]
 # Audio-specific functionality
-# coreaudio-sys = "0.2.11"  # Temporarily commented out due to edition2024 requirement
+coreaudio-sys = "0.2.11"  # Using compatible version
 cpal = "0.15"
 
 # System integration

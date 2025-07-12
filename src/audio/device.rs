@@ -45,8 +45,16 @@ impl fmt::Display for AudioDevice {
             "{} ({}): {} [{}]",
             self.name,
             self.device_type,
-            if self.is_default { "Default" } else { "Available" },
-            if self.is_available { "Online" } else { "Offline" }
+            if self.is_default {
+                "Default"
+            } else {
+                "Available"
+            },
+            if self.is_available {
+                "Online"
+            } else {
+                "Offline"
+            }
         )
     }
 }
@@ -62,17 +70,17 @@ impl AudioDevice {
             uid: None,
         }
     }
-    
+
     pub fn with_uid(mut self, uid: String) -> Self {
         self.uid = Some(uid);
         self
     }
-    
+
     pub fn set_default(mut self, is_default: bool) -> Self {
         self.is_default = is_default;
         self
     }
-    
+
     pub fn set_available(mut self, is_available: bool) -> Self {
         self.is_available = is_available;
         self

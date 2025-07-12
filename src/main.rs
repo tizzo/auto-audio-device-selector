@@ -3,13 +3,13 @@ use clap::{Parser, Subcommand};
 use tracing::info;
 use tracing_subscriber;
 
-mod config;
 mod audio;
-mod system;
+mod config;
 mod priority;
+mod system;
 
-use config::Config;
 use audio::AudioDeviceMonitor;
+use config::Config;
 
 #[derive(Parser)]
 #[command(name = "audio-device-monitor")]
@@ -18,11 +18,11 @@ use audio::AudioDeviceMonitor;
 struct Cli {
     #[command(subcommand)]
     command: Option<Commands>,
-    
+
     /// Enable verbose logging
     #[arg(short, long)]
     verbose: bool,
-    
+
     /// Configuration file path
     #[arg(short, long)]
     config: Option<String>,
@@ -49,19 +49,19 @@ enum Commands {
 #[tokio::main]
 async fn main() -> Result<()> {
     let cli = Cli::parse();
-    
+
     // Initialize logging
     let log_level = if cli.verbose { "debug" } else { "info" };
     tracing_subscriber::fmt()
         .with_env_filter(format!("audio_device_monitor={}", log_level))
         .init();
-    
+
     info!("Starting audio device monitor");
-    
+
     // Load configuration
     let config = Config::load(cli.config.as_deref())?;
     info!("Configuration loaded successfully");
-    
+
     // Handle commands
     match cli.command {
         Some(Commands::ListDevices { verbose }) => {
@@ -85,72 +85,84 @@ async fn main() -> Result<()> {
             run_daemon(config).await?;
         }
     }
-    
+
     Ok(())
 }
 
 async fn list_devices(verbose: bool) -> Result<()> {
     info!("Listing audio devices");
-    
+
     // This will be implemented with cpal device enumeration
     println!("Available audio devices:");
     println!("  [Implementation pending - Phase 1]");
-    
+
     if verbose {
         println!("  Verbose mode enabled - will show detailed device info");
     }
-    
+
     Ok(())
 }
 
 async fn test_monitor() -> Result<()> {
     info!("Starting device monitor test");
-    
+
     println!("Testing device change monitoring...");
-    println!("  [Implementation pending - Phase 2]");
-    println!("  Press Ctrl+C to stop");
-    
-    // This will be implemented with CoreAudio property listeners
+
+    // Load configuration and create monitor
+    let config = Config::load(None)?;
+    let monitor = AudioDeviceMonitor::new(config)?;
+
+    // Start monitoring in async mode
+    monitor.start_monitoring_async().await?;
+
+    // Wait for Ctrl+C
     tokio::signal::ctrl_c().await?;
+
     println!("Monitor test stopped");
-    
+    monitor.stop()?;
+
     Ok(())
 }
 
 async fn run_daemon(config: Config) -> Result<()> {
     info!("Starting daemon mode");
-    
-    let _monitor = AudioDeviceMonitor::new(config)?;
-    
+
+    let monitor = AudioDeviceMonitor::new(config)?;
+
     println!("Audio device monitor daemon started");
-    println!("  [Implementation pending - Phase 4]");
+    println!("  Real-time device monitoring active");
     println!("  Press Ctrl+C to stop");
-    
-    // This will be the main daemon loop
+
+    // Start monitoring in async mode
+    monitor.start_monitoring_async().await?;
+
+    // Wait for Ctrl+C
     tokio::signal::ctrl_c().await?;
+
     println!("Daemon stopped");
-    
+    monitor.stop()?;
+
     Ok(())
 }
 
 fn check_config(config: &Config) -> Result<()> {
     info!("Validating configuration");
-    
+
     println!("Configuration validation:");
     println!("  ✓ Configuration file parsed successfully");
     println!("  ✓ Output devices: {}", config.output_devices.len());
     println!("  ✓ Input devices: {}", config.input_devices.len());
-    
+
     // Additional validation will be added as we implement more features
-    
+
     Ok(())
 }
 
 async fn show_default_devices() -> Result<()> {
     info!("Showing current default devices");
-    
+
     println!("Current default devices:");
     println!("  [Implementation pending - Phase 1]");
-    
+
     Ok(())
 }

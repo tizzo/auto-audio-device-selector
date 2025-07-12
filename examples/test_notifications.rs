@@ -1,30 +1,34 @@
 use anyhow::Result;
-use audio_device_monitor::config::Config;
 use audio_device_monitor::AudioDeviceMonitor;
+use audio_device_monitor::config::Config;
+use std::time::Duration;
 
 #[tokio::main]
 async fn main() -> Result<()> {
     // Initialize console logging
     tracing_subscriber::fmt::init();
-    
+
     println!("Audio Device Notification Test");
     println!("==============================");
-    println!("This example will be implemented in Phase 2");
-    println!("It will demonstrate real-time device change monitoring");
-    
+
     // Load configuration
     let config = Config::default();
-    
+
     // Create monitor
     let monitor = AudioDeviceMonitor::new(config)?;
-    
+
     println!("\nStarting device monitoring...");
-    println!("Try plugging/unplugging audio devices to see notifications");
-    println!("Press Ctrl+C to stop");
-    
-    // Start monitoring (basic implementation for now)
-    monitor.start().await?;
-    
-    println!("\nMonitoring stopped");
+    println!("Monitoring for 10 seconds to test functionality");
+
+    // Start monitoring in async mode
+    monitor.start_monitoring_async().await?;
+
+    // Wait for 10 seconds to see some notifications
+    tokio::time::sleep(Duration::from_secs(10)).await;
+
+    println!("\nStopping monitoring...");
+    monitor.stop()?;
+
+    println!("Monitoring test complete!");
     Ok(())
 }
