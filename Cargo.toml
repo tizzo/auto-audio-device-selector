@@ -37,6 +37,9 @@ signal-hook = "0.3"
 signal-hook-tokio = { version = "0.3", features = ["futures-v0_3"] }
 tokio-stream = "0.1"
 
+# Notifications
+notify-rust = "4.11"
+
 [dev-dependencies]
 tokio-test = "0.4"
 

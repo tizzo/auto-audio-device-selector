@@ -5,6 +5,7 @@ use tracing::info;
 mod audio;
 mod config;
 mod logging;
+mod notifications;
 mod priority;
 mod service;
 mod system;
@@ -12,6 +13,7 @@ mod system;
 use audio::AudioDeviceMonitor;
 use config::Config;
 use logging::{LoggingConfig, cleanup_old_logs, get_default_log_dir, initialize_logging};
+use notifications::NotificationManager;
 use service::{ServiceManager, daemon::ServiceInstaller};
 
 #[derive(Parser)]
@@ -80,6 +82,8 @@ enum Commands {
         #[arg(short, long, default_value = "30")]
         keep_days: u64,
     },
+    /// Test notification system
+    TestNotification,
 }
 
 #[tokio::main]
@@ -138,6 +142,9 @@ async fn main() -> Result<()> {
         }
         Some(Commands::CleanupLogs { keep_days }) => {
             cleanup_logs(keep_days)?;
+        }
+        Some(Commands::TestNotification) => {
+            test_notification()?;
         }
         None => {
             // Default behavior - run daemon if no command specified
@@ -359,5 +366,20 @@ fn cleanup_logs(keep_days: u64) -> Result<()> {
     println!("  Log directory: {}", log_dir.display());
     println!("  Kept files newer than {keep_days} days");
 
+    Ok(())
+}
+
+fn test_notification() -> Result<()> {
+    info!("Testing notification system");
+    
+    let config = Config::default();
+    let notification_manager = NotificationManager::new(&config);
+    
+    println!("Sending test notification...");
+    notification_manager.test_notification()?;
+    
+    println!("✓ Test notification sent successfully");
+    println!("  Check your Notification Center to see if it appeared");
+    
     Ok(())
 }
