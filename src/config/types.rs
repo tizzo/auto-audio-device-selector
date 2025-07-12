@@ -1,7 +1,7 @@
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use tracing::{debug, info, warn};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -159,7 +159,7 @@ impl Config {
         Ok(home_dir.join(".config/audio-device-monitor/config.toml"))
     }
 
-    fn create_default_config(path: &PathBuf) -> Result<Self> {
+    fn create_default_config(path: &Path) -> Result<Self> {
         let config = Config::default();
 
         // Create parent directories
@@ -169,7 +169,7 @@ impl Config {
             })?;
         }
 
-        config.save(Some(path.to_str().unwrap()))?;
+        config.save(path.to_str())?;
 
         info!("Created default configuration file: {}", path.display());
         Ok(config)

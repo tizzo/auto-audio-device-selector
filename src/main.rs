@@ -253,13 +253,13 @@ async fn show_default_devices() -> Result<()> {
     println!("Current default devices:");
 
     if let Ok(Some(default_input)) = controller.get_default_input_device() {
-        println!("  Input:  {}", default_input);
+        println!("  Input:  {default_input}");
     } else {
         println!("  Input:  None available");
     }
 
     if let Ok(Some(default_output)) = controller.get_default_output_device() {
-        println!("  Output: {}", default_output);
+        println!("  Output: {default_output}");
     } else {
         println!("  Output: None available");
     }
@@ -297,7 +297,7 @@ async fn switch_device(device_name: &str, is_input: bool) -> Result<()> {
             );
         }
         Err(e) => {
-            println!("✗ Failed to switch device: {}", e);
+            println!("✗ Failed to switch device: {e}");
             return Err(e);
         }
     }
@@ -357,7 +357,7 @@ fn cleanup_logs(keep_days: u64) -> Result<()> {
 
     println!("✓ Log cleanup completed");
     println!("  Log directory: {}", log_dir.display());
-    println!("  Kept files newer than {} days", keep_days);
+    println!("  Kept files newer than {keep_days} days");
 
     Ok(())
 }

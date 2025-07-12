@@ -21,20 +21,20 @@ async fn main() -> Result<()> {
     }
 
     for (i, device) in devices.iter().enumerate() {
-        println!("{}. {}", i + 1, device);
+        println!("{}. {device}", i + 1);
     }
 
     // Show default devices
     println!("\n--- Default Devices ---");
 
     if let Ok(Some(default_input)) = controller.get_default_input_device() {
-        println!("Default Input:  {}", default_input);
+        println!("Default Input:  {default_input}");
     } else {
         println!("Default Input:  None");
     }
 
     if let Ok(Some(default_output)) = controller.get_default_output_device() {
-        println!("Default Output: {}", default_output);
+        println!("Default Output: {default_output}");
     } else {
         println!("Default Output: None");
     }

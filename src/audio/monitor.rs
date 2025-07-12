@@ -71,7 +71,7 @@ impl AudioDeviceMonitor {
 
         println!("Found {} audio devices:", devices.len());
         for device in &devices {
-            println!("  {}", device);
+            println!("  {device}");
         }
 
         // Show default devices
