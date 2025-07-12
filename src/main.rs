@@ -91,15 +91,42 @@ async fn main() -> Result<()> {
 
 async fn list_devices(verbose: bool) -> Result<()> {
     info!("Listing audio devices");
-
-    // This will be implemented with cpal device enumeration
+    
+    let controller = audio::controller::DeviceController::new()?;
+    let devices = controller.enumerate_devices()?;
+    
     println!("Available audio devices:");
-    println!("  [Implementation pending - Phase 1]");
-
-    if verbose {
-        println!("  Verbose mode enabled - will show detailed device info");
+    if devices.is_empty() {
+        println!("  No audio devices found!");
+        return Ok(());
     }
-
+    
+    for (i, device) in devices.iter().enumerate() {
+        println!("  {}. {}", i + 1, device);
+    }
+    
+    // Show default devices
+    if let Ok(Some(default_input)) = controller.get_default_input_device() {
+        println!("Default input: {}", default_input.name);
+    }
+    
+    if let Ok(Some(default_output)) = controller.get_default_output_device() {
+        println!("Default output: {}", default_output.name);
+    }
+    
+    if verbose {
+        println!("\n--- Detailed Device Information ---");
+        for device in &devices {
+            if let Ok(info) = controller.get_device_info(device) {
+                println!("Device: {}", info.name);
+                println!("  UID: {}", info.uid);
+                println!("  Type: {}", info.device_type);
+                println!("  Default: {}", info.is_default);
+                println!();
+            }
+        }
+    }
+    
     Ok(())
 }
 
@@ -161,8 +188,21 @@ fn check_config(config: &Config) -> Result<()> {
 async fn show_default_devices() -> Result<()> {
     info!("Showing current default devices");
 
+    let controller = audio::controller::DeviceController::new()?;
+    
     println!("Current default devices:");
-    println!("  [Implementation pending - Phase 1]");
+    
+    if let Ok(Some(default_input)) = controller.get_default_input_device() {
+        println!("  Input:  {}", default_input);
+    } else {
+        println!("  Input:  None available");
+    }
+    
+    if let Ok(Some(default_output)) = controller.get_default_output_device() {
+        println!("  Output: {}", default_output);
+    } else {
+        println!("  Output: None available");
+    }
 
     Ok(())
 }

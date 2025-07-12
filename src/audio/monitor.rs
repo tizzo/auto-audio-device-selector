@@ -1,5 +1,5 @@
 use anyhow::Result;
-use tracing::{debug, info};
+use tracing::info;
 
 use super::controller::DeviceController;
 use super::listener::CoreAudioListener;
@@ -7,6 +7,7 @@ use crate::config::Config;
 
 pub struct AudioDeviceMonitor {
     controller: DeviceController,
+    #[allow(dead_code)]
     config: Config,
     listener: CoreAudioListener,
 }
@@ -25,6 +26,7 @@ impl AudioDeviceMonitor {
         })
     }
 
+    #[allow(dead_code)]
     pub async fn start(&self) -> Result<()> {
         info!("Starting audio device monitor");
 

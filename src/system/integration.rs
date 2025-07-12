@@ -15,6 +15,7 @@ impl SystemIntegration {
         })
     }
 
+    #[allow(dead_code)]
     pub fn start_event_loop(&self) -> Result<()> {
         debug!("Starting Core Foundation event loop (Phase 2)");
 
@@ -22,6 +23,7 @@ impl SystemIntegration {
         Ok(())
     }
 
+    #[allow(dead_code)]
     pub fn register_system_notifications(&self) -> Result<()> {
         debug!("Registering system notifications (Phase 2)");
 
@@ -29,6 +31,7 @@ impl SystemIntegration {
         Ok(())
     }
 
+    #[allow(dead_code)]
     pub fn schedule_periodic_checks(&self, _interval: Duration) -> Result<()> {
         debug!("Scheduling periodic checks (Phase 2)");
 

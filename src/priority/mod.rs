@@ -1,3 +1,3 @@
 pub mod manager;
 
-pub use manager::DevicePriorityManager;
+pub(crate) use manager::DevicePriorityManager;

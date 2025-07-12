@@ -10,11 +10,13 @@ pub enum DeviceType {
 
 #[derive(Debug, Clone)]
 pub struct AudioDevice {
+    #[allow(dead_code)]
     pub id: String,
     pub name: String,
     pub device_type: DeviceType,
     pub is_default: bool,
     pub is_available: bool,
+    #[allow(dead_code)]
     pub uid: Option<String>,
 }
 
@@ -71,6 +73,7 @@ impl AudioDevice {
         }
     }
 
+    #[allow(dead_code)]
     pub fn with_uid(mut self, uid: String) -> Self {
         self.uid = Some(uid);
         self
@@ -81,6 +84,7 @@ impl AudioDevice {
         self
     }
 
+    #[allow(dead_code)]
     pub fn set_available(mut self, is_available: bool) -> Self {
         self.is_available = is_available;
         self
