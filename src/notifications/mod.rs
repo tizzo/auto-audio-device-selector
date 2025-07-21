@@ -1,5 +1,4 @@
 use anyhow::Result;
-use notify_rust::{Notification, Timeout};
 use tracing::{debug, error, info, warn};
 
 use crate::audio::AudioDevice;
@@ -118,46 +117,19 @@ impl NotificationManager {
         Ok(())
     }
 
-    /// Send a generic system notification
+    /// Send a generic system notification using native macOS osascript
     fn send_notification(
         &self,
         title: &str,
         body: &str,
-        notification_type: NotificationType,
+        _notification_type: NotificationType,
     ) -> Result<()> {
         debug!("Sending notification: {} - {}", title, body);
 
-        let mut notification = Notification::new();
-        notification
-            .summary(title)
-            .body(body)
-            .appname("Audio Device Monitor")
-            .timeout(Timeout::Milliseconds(5000)); // 5 second timeout
-
-        // Set different icons/sounds based on notification type
-        match notification_type {
-            NotificationType::DeviceChange => {
-                notification.sound_name("Glass"); // System sound for device changes
-            }
-            NotificationType::SwitchAction => {
-                notification.sound_name("Purr"); // Different sound for switching
-            }
-            NotificationType::Error => {
-                notification.sound_name("Basso"); // Error sound
-            }
-        }
-
-        // Send the notification
-        match notification.show() {
-            Ok(_) => {
-                debug!("Successfully sent notification: {}", title);
-            }
-            Err(e) => {
-                error!("Failed to send notification '{}': {}", title, e);
-                return Err(anyhow::anyhow!("Failed to send notification: {}", e));
-            }
-        }
-
+        // Send notification using native macOS osascript
+        self.send_native_macos_notification(title, body)?;
+        
+        debug!("Successfully sent notification via native macOS osascript: {}", title);
         Ok(())
     }
 
@@ -179,13 +151,52 @@ impl NotificationManager {
 
     /// Test notification (for debugging)
     pub fn test_notification(&self) -> Result<()> {
+        info!("Starting notification test...");
+        
         let title = "Audio Device Monitor";
         let body = "Notification system is working correctly! 🎵";
-
-        self.send_notification(title, body, NotificationType::DeviceChange)?;
-
-        info!("Sent test notification");
+        
+        info!("Sending native macOS osascript notification...");
+        
+        match self.send_native_macos_notification(title, body) {
+            Ok(_) => {
+                info!("Native macOS notification sent successfully");
+                info!("Check your notifications (should appear in top-right corner)");
+                info!("This notification method works reliably for unsigned apps");
+            }
+            Err(e) => {
+                error!("Failed to send notification: {}", e);
+                error!("This might be due to:");
+                error!("1. Do Not Disturb mode is enabled");
+                error!("2. osascript is not available or restricted");
+                error!("3. System-level notification restrictions");
+                return Err(anyhow::anyhow!("Failed to send notification: {}", e));
+            }
+        }
+        
+        info!("Test notification completed");
         Ok(())
+    }
+    
+    /// Send notification using native macOS osascript (more reliable for unsigned apps)
+    fn send_native_macos_notification(&self, title: &str, body: &str) -> Result<()> {
+        use std::process::Command;
+        
+        let script = format!(
+            r#"display notification "{}" with title "{}""#,
+            body.replace('"', "\\\""), title.replace('"', "\\\"")
+        );
+        
+        let output = Command::new("osascript")
+            .args(["-e", &script])
+            .output()?;
+            
+        if output.status.success() {
+            Ok(())
+        } else {
+            let error = String::from_utf8_lossy(&output.stderr);
+            Err(anyhow::anyhow!("osascript failed: {}", error))
+        }
     }
 }
 

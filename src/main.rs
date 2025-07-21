@@ -1,6 +1,6 @@
 use anyhow::Result;
 use clap::{Parser, Subcommand};
-use tracing::info;
+use tracing::{info, warn};
 
 mod audio;
 mod config;
@@ -84,6 +84,8 @@ enum Commands {
     },
     /// Test notification system
     TestNotification,
+    /// Force notification via osascript only
+    ForceNotification,
 }
 
 #[tokio::main]
@@ -145,6 +147,9 @@ async fn main() -> Result<()> {
         }
         Some(Commands::TestNotification) => {
             test_notification()?;
+        }
+        Some(Commands::ForceNotification) => {
+            force_notification()?;
         }
         None => {
             // Default behavior - run daemon if no command specified
@@ -282,6 +287,8 @@ async fn switch_device(device_name: &str, is_input: bool) -> Result<()> {
     );
 
     let controller = audio::controller::DeviceController::new()?;
+    let config = Config::load(None)?;
+    let notification_manager = NotificationManager::new(&config);
 
     println!(
         "Switching {} device to: {}",
@@ -302,9 +309,27 @@ async fn switch_device(device_name: &str, is_input: bool) -> Result<()> {
                 if is_input { "input" } else { "output" },
                 device_name
             );
+            
+            // Send manual switch notification
+            if let Ok(devices) = controller.enumerate_devices() {
+                if let Some(device) = devices.iter().find(|d| d.name == device_name) {
+                    if let Err(e) = notification_manager.device_switched(
+                        device,
+                        crate::notifications::SwitchReason::Manual
+                    ) {
+                        warn!("Failed to send manual switch notification: {}", e);
+                    }
+                }
+            }
         }
         Err(e) => {
             println!("✗ Failed to switch device: {e}");
+            
+            // Send switch failed notification
+            if let Err(notification_err) = notification_manager.switch_failed(device_name, &e.to_string()) {
+                warn!("Failed to send switch failed notification: {}", notification_err);
+            }
+            
             return Err(e);
         }
     }
@@ -372,14 +397,61 @@ fn cleanup_logs(keep_days: u64) -> Result<()> {
 fn test_notification() -> Result<()> {
     info!("Testing notification system");
 
-    let config = Config::default();
+    let config = Config::load(None)?;
     let notification_manager = NotificationManager::new(&config);
 
-    println!("Sending test notification...");
+    println!("🔔 Testing macOS Notification System");
+    println!("=====================================");
+    println!("");
+    
+    println!("📱 Sending test notification...");
     notification_manager.test_notification()?;
+    
+    println!("");
+    println!("✅ Notification sent successfully!");
+    println!("");
+    println!("🔍 If you don't see the notification, try:");
+    println!("   1. Click the 🕐 clock icon in top-right corner");
+    println!("   2. Check if 'Do Not Disturb' is disabled");
+    println!("   3. Open System Preferences > Notifications & Focus");
+    println!("   4. Look for 'Audio Device Monitor' in the app list");
+    println!("   5. Enable 'Allow Notifications' and 'Show in Notification Center'");
+    println!("");
+    println!("💡 On first run, macOS may ask for notification permission");
+    println!("   Grant permission when prompted, then run this test again");
 
-    println!("✓ Test notification sent successfully");
-    println!("  Check your Notification Center to see if it appeared");
+    Ok(())
+}
 
+fn force_notification() -> Result<()> {
+    use std::process::Command;
+    
+    println!("🚀 Forcing notification via macOS osascript");
+    println!("==========================================");
+    
+    let title = "Audio Device Monitor - Force Test";
+    let body = "This notification was sent directly via macOS osascript! 🎉";
+    
+    let script = format!(
+        r#"display notification "{}" with title "{}""#,
+        body, title
+    );
+    
+    println!("📱 Executing: osascript -e '{}'", script);
+    
+    let output = Command::new("osascript")
+        .args(["-e", &script])
+        .output()?;
+        
+    if output.status.success() {
+        println!("✅ macOS notification sent successfully!");
+        println!("🔍 This should appear immediately in the top-right corner");
+        println!("   If you don't see it, notifications might be globally disabled");
+    } else {
+        let error = String::from_utf8_lossy(&output.stderr);
+        println!("❌ Failed to send notification: {}", error);
+        println!("💡 This suggests a system-level notification issue");
+    }
+    
     Ok(())
 }
