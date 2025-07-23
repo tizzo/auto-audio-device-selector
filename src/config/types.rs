@@ -26,14 +26,75 @@ pub struct GeneralConfig {
     pub daemon_mode: bool,
 }
 
+// Helper struct for deserialization that preserves field presence information
+#[derive(Debug, Clone, Deserialize)]
+struct NotificationConfigHelper {
+    #[serde(default)]
+    show_device_availability: Option<bool>, // None = not present, Some(x) = explicitly set
+    #[serde(default = "default_show_switching_actions")]
+    show_switching_actions: bool,
+    #[serde(alias = "show_device_changes")]
+    show_device_changes: Option<bool>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(from = "NotificationConfigHelper")]
 pub struct NotificationConfig {
     pub show_device_availability: bool, // Device connect/disconnect notifications
     pub show_switching_actions: bool,   // Device switching notifications
 
     // Keep old field for backward compatibility
-    #[serde(alias = "show_device_changes")]
+    #[serde(skip)]
     pub show_device_changes: Option<bool>,
+}
+
+fn default_show_switching_actions() -> bool {
+    true
+}
+
+impl From<NotificationConfigHelper> for NotificationConfig {
+    fn from(helper: NotificationConfigHelper) -> Self {
+        let was_explicitly_set = helper.show_device_availability.is_some();
+        let mut result = NotificationConfig {
+            show_device_availability: helper.show_device_availability.unwrap_or(false),
+            show_switching_actions: helper.show_switching_actions,
+            show_device_changes: helper.show_device_changes,
+        };
+
+        // Apply migration logic with presence information
+        result = result.migrate_with_presence_info(was_explicitly_set);
+        result
+    }
+}
+
+impl NotificationConfig {
+    /// Handle backward compatibility for old config files
+    /// This method is primarily for external callers who need to migrate configs manually
+    pub fn migrate_from_old_config(mut self) -> Self {
+        // For external callers, we don't have presence information
+        // so we use the conservative approach: only migrate when old field exists
+        // and new field is false (likely a migration scenario)
+        if let Some(old_value) = self.show_device_changes {
+            if !self.show_device_availability && old_value {
+                self.show_device_availability = old_value;
+            }
+        }
+        self.show_device_changes = None;
+        self
+    }
+
+    /// Internal method used during deserialization to handle migration
+    fn migrate_with_presence_info(mut self, was_explicitly_set: bool) -> Self {
+        if let Some(old_value) = self.show_device_changes {
+            // Only migrate if the new field was NOT explicitly set in the TOML
+            if !was_explicitly_set {
+                self.show_device_availability = old_value;
+            }
+            // If the field was explicitly set, respect that value and don't migrate
+        }
+        self.show_device_changes = None;
+        self
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -61,19 +122,6 @@ impl Default for GeneralConfig {
             log_level: "info".to_string(),
             daemon_mode: false,
         }
-    }
-}
-
-impl NotificationConfig {
-    /// Handle backward compatibility for old config files
-    pub fn migrate_from_old_config(mut self) -> Self {
-        // If old show_device_changes is present, use it for device availability
-        if let Some(old_value) = self.show_device_changes {
-            self.show_device_availability = old_value;
-        }
-        // Clear the compatibility field
-        self.show_device_changes = None;
-        self
     }
 }
 
@@ -183,14 +231,28 @@ impl Config {
     fn create_default_config(path: &Path) -> Result<Self> {
         let config = Config::default();
 
-        // Create parent directories
+        // Try to create parent directories, but don't fail if we can't
+        // This handles cases where the path is invalid or we don't have permissions
         if let Some(parent) = path.parent() {
-            fs::create_dir_all(parent).with_context(|| {
-                format!("Failed to create config directory: {}", parent.display())
-            })?;
+            if let Err(e) = fs::create_dir_all(parent) {
+                warn!(
+                    "Could not create config directory {}: {}. Using default config without saving.",
+                    parent.display(),
+                    e
+                );
+                return Ok(config);
+            }
         }
 
-        config.save(path.to_str())?;
+        // Try to save the config, but don't fail if we can't
+        if let Err(e) = config.save(path.to_str()) {
+            warn!(
+                "Could not save default config to {}: {}. Using default config.",
+                path.display(),
+                e
+            );
+            return Ok(config);
+        }
 
         info!("Created default configuration file: {}", path.display());
         Ok(config)
