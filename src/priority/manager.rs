@@ -1,6 +1,6 @@
 use tracing::{debug, info};
 
-use crate::audio::AudioDevice;
+use crate::audio::{AudioDevice, DeviceType};
 use crate::config::{Config, DeviceRule};
 
 pub struct DevicePriorityManager {
@@ -26,28 +26,40 @@ impl DevicePriorityManager {
         &self,
         available_devices: &[AudioDevice],
     ) -> Option<AudioDevice> {
-        self.find_best_device(available_devices, &self.output_priorities, "output")
+        self.find_best_device(
+            available_devices,
+            &self.output_priorities,
+            DeviceType::Output,
+        )
     }
 
     pub fn find_best_input_device(&self, available_devices: &[AudioDevice]) -> Option<AudioDevice> {
-        self.find_best_device(available_devices, &self.input_priorities, "input")
+        self.find_best_device(available_devices, &self.input_priorities, DeviceType::Input)
     }
 
     fn find_best_device(
         &self,
         available_devices: &[AudioDevice],
         priorities: &[DeviceRule],
-        device_type: &str,
+        device_type: DeviceType,
     ) -> Option<AudioDevice> {
         let mut best_device: Option<AudioDevice> = None;
         let mut best_weight = 0;
 
+        // Filter devices by type first
+        let filtered_devices: Vec<&AudioDevice> = available_devices
+            .iter()
+            .filter(|device| device.device_type == device_type)
+            .collect();
+
         debug!(
-            "Evaluating {} devices for {} type:",
-            available_devices.len(),
-            device_type
+            "Evaluating {} {} devices (filtered from {} total):",
+            filtered_devices.len(),
+            device_type,
+            available_devices.len()
         );
-        for device in available_devices {
+
+        for device in filtered_devices {
             debug!("  Checking device: '{}'", device.name);
             for rule in priorities {
                 let matches = rule.matches(&device.name);
