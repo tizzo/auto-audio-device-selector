@@ -128,8 +128,11 @@ impl NotificationManager {
 
         // Send notification using native macOS osascript
         self.send_native_macos_notification(title, body)?;
-        
-        debug!("Successfully sent notification via native macOS osascript: {}", title);
+
+        debug!(
+            "Successfully sent notification via native macOS osascript: {}",
+            title
+        );
         Ok(())
     }
 
@@ -152,12 +155,12 @@ impl NotificationManager {
     /// Test notification (for debugging)
     pub fn test_notification(&self) -> Result<()> {
         info!("Starting notification test...");
-        
+
         let title = "Audio Device Monitor";
-        let body = "Notification system is working correctly! 🎵";
-        
+        let body = "Notification system is working correctly!";
+
         info!("Sending native macOS osascript notification...");
-        
+
         match self.send_native_macos_notification(title, body) {
             Ok(_) => {
                 info!("Native macOS notification sent successfully");
@@ -173,24 +176,23 @@ impl NotificationManager {
                 return Err(anyhow::anyhow!("Failed to send notification: {}", e));
             }
         }
-        
+
         info!("Test notification completed");
         Ok(())
     }
-    
+
     /// Send notification using native macOS osascript (more reliable for unsigned apps)
     fn send_native_macos_notification(&self, title: &str, body: &str) -> Result<()> {
         use std::process::Command;
-        
+
         let script = format!(
-            r#"display notification "{}" with title "{}""#,
-            body.replace('"', "\\\""), title.replace('"', "\\\"")
+            r#"display notification "{}" with title "{}" subtitle "" sound name """#,
+            body.replace('"', "\\\""),
+            title.replace('"', "\\\"")
         );
-        
-        let output = Command::new("osascript")
-            .args(["-e", &script])
-            .output()?;
-            
+
+        let output = Command::new("osascript").args(["-e", &script]).output()?;
+
         if output.status.success() {
             Ok(())
         } else {

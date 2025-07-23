@@ -42,9 +42,20 @@ impl DevicePriorityManager {
         let mut best_device: Option<AudioDevice> = None;
         let mut best_weight = 0;
 
+        debug!(
+            "Evaluating {} devices for {} type:",
+            available_devices.len(),
+            device_type
+        );
         for device in available_devices {
+            debug!("  Checking device: '{}'", device.name);
             for rule in priorities {
-                if rule.matches(&device.name) && rule.weight > best_weight {
+                let matches = rule.matches(&device.name);
+                debug!(
+                    "    Rule '{}' (type: {:?}, weight: {}) -> matches: {}",
+                    rule.name, rule.match_type, rule.weight, matches
+                );
+                if matches && rule.weight > best_weight {
                     best_device = Some(device.clone());
                     best_weight = rule.weight;
                     debug!(

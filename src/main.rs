@@ -309,14 +309,13 @@ async fn switch_device(device_name: &str, is_input: bool) -> Result<()> {
                 if is_input { "input" } else { "output" },
                 device_name
             );
-            
+
             // Send manual switch notification
             if let Ok(devices) = controller.enumerate_devices() {
                 if let Some(device) = devices.iter().find(|d| d.name == device_name) {
-                    if let Err(e) = notification_manager.device_switched(
-                        device,
-                        crate::notifications::SwitchReason::Manual
-                    ) {
+                    if let Err(e) = notification_manager
+                        .device_switched(device, crate::notifications::SwitchReason::Manual)
+                    {
                         warn!("Failed to send manual switch notification: {}", e);
                     }
                 }
@@ -324,12 +323,17 @@ async fn switch_device(device_name: &str, is_input: bool) -> Result<()> {
         }
         Err(e) => {
             println!("✗ Failed to switch device: {e}");
-            
+
             // Send switch failed notification
-            if let Err(notification_err) = notification_manager.switch_failed(device_name, &e.to_string()) {
-                warn!("Failed to send switch failed notification: {}", notification_err);
+            if let Err(notification_err) =
+                notification_manager.switch_failed(device_name, &e.to_string())
+            {
+                warn!(
+                    "Failed to send switch failed notification: {}",
+                    notification_err
+                );
             }
-            
+
             return Err(e);
         }
     }
@@ -403,10 +407,10 @@ fn test_notification() -> Result<()> {
     println!("🔔 Testing macOS Notification System");
     println!("=====================================");
     println!("");
-    
+
     println!("📱 Sending test notification...");
     notification_manager.test_notification()?;
-    
+
     println!("");
     println!("✅ Notification sent successfully!");
     println!("");
@@ -425,24 +429,22 @@ fn test_notification() -> Result<()> {
 
 fn force_notification() -> Result<()> {
     use std::process::Command;
-    
+
     println!("🚀 Forcing notification via macOS osascript");
     println!("==========================================");
-    
+
     let title = "Audio Device Monitor - Force Test";
     let body = "This notification was sent directly via macOS osascript! 🎉";
-    
+
     let script = format!(
-        r#"display notification "{}" with title "{}""#,
+        r#"display notification "{}" with title "{}" icon name "Sound""#,
         body, title
     );
-    
+
     println!("📱 Executing: osascript -e '{}'", script);
-    
-    let output = Command::new("osascript")
-        .args(["-e", &script])
-        .output()?;
-        
+
+    let output = Command::new("osascript").args(["-e", &script]).output()?;
+
     if output.status.success() {
         println!("✅ macOS notification sent successfully!");
         println!("🔍 This should appear immediately in the top-right corner");
@@ -452,6 +454,6 @@ fn force_notification() -> Result<()> {
         println!("❌ Failed to send notification: {}", error);
         println!("💡 This suggests a system-level notification issue");
     }
-    
+
     Ok(())
 }

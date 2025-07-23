@@ -2,60 +2,98 @@ use anyhow::Result;
 use core_foundation::base::TCFType;
 use core_foundation::string::{CFString, CFStringRef};
 use coreaudio_sys::*;
-use cpal::traits::{DeviceTrait, HostTrait};
-use cpal::{Device, Host};
+// Removed cpal imports
 use std::os::raw::c_void;
 use std::ptr;
-use tracing::{debug, error, info, warn};
+use tracing::{debug, error, info};
 
 use super::device::{AudioDevice, DeviceInfo, DeviceType};
 
 pub struct DeviceController {
-    host: Host,
+    // No longer need cpal host
 }
 
 impl DeviceController {
     pub fn new() -> Result<Self> {
-        let host = cpal::default_host();
-        info!(
-            "Initialized audio device controller with host: {}",
-            host.id().name()
-        );
-
-        Ok(Self { host })
+        info!("Initialized audio device controller with CoreAudio");
+        Ok(Self {})
     }
 
     pub fn enumerate_devices(&self) -> Result<Vec<AudioDevice>> {
         let mut devices = Vec::new();
 
-        // Get input devices
-        match self.host.input_devices() {
-            Ok(input_devices) => {
-                for device in input_devices {
-                    if let Ok(audio_device) = self.device_to_audio_device(device, DeviceType::Input)
-                    {
-                        devices.push(audio_device);
-                    }
-                }
-            }
-            Err(e) => {
-                warn!("Failed to enumerate input devices: {}", e);
-            }
-        }
+        unsafe {
+            // Get list of all audio devices
+            let property_address = AudioObjectPropertyAddress {
+                mSelector: kAudioHardwarePropertyDevices,
+                mScope: kAudioObjectPropertyScopeGlobal,
+                mElement: kAudioObjectPropertyElementMain,
+            };
 
-        // Get output devices
-        match self.host.output_devices() {
-            Ok(output_devices) => {
-                for device in output_devices {
-                    if let Ok(audio_device) =
-                        self.device_to_audio_device(device, DeviceType::Output)
-                    {
+            let mut property_size: u32 = 0;
+            let result = AudioObjectGetPropertyDataSize(
+                kAudioObjectSystemObject,
+                &property_address,
+                0,
+                ptr::null(),
+                &mut property_size,
+            );
+
+            if result != kAudioHardwareNoError as i32 {
+                return Err(anyhow::anyhow!("Failed to get device list size"));
+            }
+
+            let device_count = property_size / std::mem::size_of::<AudioDeviceID>() as u32;
+            let mut device_ids = vec![0u32; device_count as usize];
+
+            let result = AudioObjectGetPropertyData(
+                kAudioObjectSystemObject,
+                &property_address,
+                0,
+                ptr::null(),
+                &mut property_size,
+                device_ids.as_mut_ptr() as *mut c_void,
+            );
+
+            if result != kAudioHardwareNoError as i32 {
+                return Err(anyhow::anyhow!("Failed to get device list"));
+            }
+
+            // Process each device
+            for &device_id in &device_ids {
+                if let Ok(name) = self.get_coreaudio_device_name(device_id) {
+                    // Check if device supports input
+                    if self.device_supports_direction(device_id, true)? {
+                        let mut audio_device = AudioDevice::new(
+                            device_id.to_string(),
+                            name.clone(),
+                            DeviceType::Input,
+                        );
+
+                        // Get device UID for more reliable identification
+                        if let Ok(uid) = self.get_coreaudio_device_uid(device_id) {
+                            audio_device = audio_device.with_uid(uid);
+                        }
+
+                        devices.push(audio_device);
+                    }
+
+                    // Check if device supports output
+                    if self.device_supports_direction(device_id, false)? {
+                        let mut audio_device = AudioDevice::new(
+                            device_id.to_string(),
+                            name.clone(),
+                            DeviceType::Output,
+                        );
+
+                        // Get device UID for more reliable identification
+                        if let Ok(uid) = self.get_coreaudio_device_uid(device_id) {
+                            audio_device = audio_device.with_uid(uid);
+                        }
+
                         devices.push(audio_device);
                     }
                 }
-            }
-            Err(e) => {
-                warn!("Failed to enumerate output devices: {}", e);
             }
         }
 
@@ -64,28 +102,84 @@ impl DeviceController {
     }
 
     pub fn get_default_input_device(&self) -> Result<Option<AudioDevice>> {
-        match self.host.default_input_device() {
-            Some(device) => {
-                let mut audio_device = self.device_to_audio_device(device, DeviceType::Input)?;
+        unsafe {
+            let property_address = AudioObjectPropertyAddress {
+                mSelector: kAudioHardwarePropertyDefaultInputDevice,
+                mScope: kAudioObjectPropertyScopeGlobal,
+                mElement: kAudioObjectPropertyElementMain,
+            };
+
+            let mut device_id: AudioDeviceID = 0;
+            let mut property_size = std::mem::size_of::<AudioDeviceID>() as u32;
+
+            let result = AudioObjectGetPropertyData(
+                kAudioObjectSystemObject,
+                &property_address,
+                0,
+                ptr::null(),
+                &mut property_size,
+                &mut device_id as *mut _ as *mut c_void,
+            );
+
+            if result != kAudioHardwareNoError as i32 || device_id == kAudioDeviceUnknown {
+                debug!("No default input device found");
+                return Ok(None);
+            }
+
+            if let Ok(name) = self.get_coreaudio_device_name(device_id) {
+                let mut audio_device =
+                    AudioDevice::new(device_id.to_string(), name, DeviceType::Input);
+
+                if let Ok(uid) = self.get_coreaudio_device_uid(device_id) {
+                    audio_device = audio_device.with_uid(uid);
+                }
+
                 audio_device = audio_device.set_default(true);
                 Ok(Some(audio_device))
-            }
-            None => {
-                debug!("No default input device found");
+            } else {
+                debug!("Could not get name for default input device");
                 Ok(None)
             }
         }
     }
 
     pub fn get_default_output_device(&self) -> Result<Option<AudioDevice>> {
-        match self.host.default_output_device() {
-            Some(device) => {
-                let mut audio_device = self.device_to_audio_device(device, DeviceType::Output)?;
+        unsafe {
+            let property_address = AudioObjectPropertyAddress {
+                mSelector: kAudioHardwarePropertyDefaultOutputDevice,
+                mScope: kAudioObjectPropertyScopeGlobal,
+                mElement: kAudioObjectPropertyElementMain,
+            };
+
+            let mut device_id: AudioDeviceID = 0;
+            let mut property_size = std::mem::size_of::<AudioDeviceID>() as u32;
+
+            let result = AudioObjectGetPropertyData(
+                kAudioObjectSystemObject,
+                &property_address,
+                0,
+                ptr::null(),
+                &mut property_size,
+                &mut device_id as *mut _ as *mut c_void,
+            );
+
+            if result != kAudioHardwareNoError as i32 || device_id == kAudioDeviceUnknown {
+                debug!("No default output device found");
+                return Ok(None);
+            }
+
+            if let Ok(name) = self.get_coreaudio_device_name(device_id) {
+                let mut audio_device =
+                    AudioDevice::new(device_id.to_string(), name, DeviceType::Output);
+
+                if let Ok(uid) = self.get_coreaudio_device_uid(device_id) {
+                    audio_device = audio_device.with_uid(uid);
+                }
+
                 audio_device = audio_device.set_default(true);
                 Ok(Some(audio_device))
-            }
-            None => {
-                debug!("No default output device found");
+            } else {
+                debug!("Could not get name for default output device");
                 Ok(None)
             }
         }
@@ -287,7 +381,41 @@ impl DeviceController {
         }
     }
 
-    /// Check if device supports input or output
+    /// Get the UID of a CoreAudio device
+    fn get_coreaudio_device_uid(&self, device_id: AudioDeviceID) -> Result<String> {
+        let property_address = AudioObjectPropertyAddress {
+            mSelector: kAudioDevicePropertyDeviceUID,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain,
+        };
+
+        unsafe {
+            let mut property_size = std::mem::size_of::<CFStringRef>() as u32;
+            let mut cf_string: CFStringRef = ptr::null();
+
+            let result = AudioObjectGetPropertyData(
+                device_id,
+                &property_address,
+                0,
+                ptr::null(),
+                &mut property_size,
+                &mut cf_string as *mut _ as *mut c_void,
+            );
+
+            if result != kAudioHardwareNoError as i32 {
+                return Err(anyhow::anyhow!("Failed to get device UID"));
+            }
+
+            if cf_string.is_null() {
+                return Err(anyhow::anyhow!("Device UID is null"));
+            }
+
+            let cf_string = CFString::wrap_under_get_rule(cf_string);
+            Ok(cf_string.to_string())
+        }
+    }
+
+    /// Check if device supports input or output by checking actual channel count
     fn device_supports_direction(&self, device_id: AudioDeviceID, is_input: bool) -> Result<bool> {
         let property_address = AudioObjectPropertyAddress {
             mSelector: kAudioDevicePropertyStreamConfiguration,
@@ -309,30 +437,46 @@ impl DeviceController {
                 &mut property_size,
             );
 
+            if result != kAudioHardwareNoError as i32 || property_size == 0 {
+                return Ok(false);
+            }
+
+            // Get the stream configuration to check actual channel counts
+            let mut buffer = vec![0u8; property_size as usize];
+            let result = AudioObjectGetPropertyData(
+                device_id,
+                &property_address,
+                0,
+                ptr::null(),
+                &mut property_size,
+                buffer.as_mut_ptr() as *mut c_void,
+            );
+
             if result != kAudioHardwareNoError as i32 {
                 return Ok(false);
             }
 
-            // If property_size > 0, device supports this direction
-            Ok(property_size > 0)
+            // Parse AudioBufferList to check for actual channels
+            let buffer_list = buffer.as_ptr() as *const AudioBufferList;
+            let buffer_count = (*buffer_list).mNumberBuffers;
+
+            if buffer_count == 0 {
+                return Ok(false);
+            }
+
+            // Check if any buffer has channels
+            for i in 0..buffer_count {
+                let buffer = &(*buffer_list).mBuffers[i as usize];
+                if buffer.mNumberChannels > 0 {
+                    return Ok(true);
+                }
+            }
+
+            Ok(false)
         }
     }
 
-    // Convert cpal::Device to our AudioDevice
-    fn device_to_audio_device(
-        &self,
-        device: Device,
-        device_type: DeviceType,
-    ) -> Result<AudioDevice> {
-        let name = device
-            .name()
-            .unwrap_or_else(|_| "Unknown Device".to_string());
-
-        // For now, use the name as the ID. Later we'll use proper device UIDs
-        let id = name.clone();
-
-        Ok(AudioDevice::new(id, name, device_type))
-    }
+    // Removed old cpal-dependent device conversion method
 }
 
 impl Default for DeviceController {
