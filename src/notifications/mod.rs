@@ -7,22 +7,22 @@ use crate::config::Config;
 /// Manages system notifications for audio device events
 pub struct NotificationManager {
     enabled: bool,
-    show_device_changes: bool,
-    show_switching_actions: bool,
+    show_device_availability: bool, // Device connect/disconnect notifications
+    show_switching_actions: bool,   // Device switching notifications
 }
 
 impl NotificationManager {
     pub fn new(config: &Config) -> Self {
         Self {
             enabled: true, // Can be controlled by config in the future
-            show_device_changes: config.notifications.show_device_changes,
+            show_device_availability: config.notifications.show_device_availability,
             show_switching_actions: config.notifications.show_switching_actions,
         }
     }
 
     /// Send notification when a device comes online
     pub fn device_connected(&self, device: &AudioDevice) -> Result<()> {
-        if !self.enabled || !self.show_device_changes {
+        if !self.enabled || !self.show_device_availability {
             return Ok(());
         }
 
@@ -43,7 +43,7 @@ impl NotificationManager {
 
     /// Send notification when a device goes offline
     pub fn device_disconnected(&self, device: &AudioDevice) -> Result<()> {
-        if !self.enabled || !self.show_device_changes {
+        if !self.enabled || !self.show_device_availability {
             return Ok(());
         }
 
@@ -223,8 +223,8 @@ impl Default for NotificationManager {
     fn default() -> Self {
         Self {
             enabled: true,
-            show_device_changes: true,
-            show_switching_actions: true,
+            show_device_availability: false, // Default: no device availability notifications
+            show_switching_actions: true,    // Default: show switching notifications
         }
     }
 }

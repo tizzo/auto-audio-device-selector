@@ -28,8 +28,12 @@ pub struct GeneralConfig {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NotificationConfig {
-    pub show_device_changes: bool,
-    pub show_switching_actions: bool,
+    pub show_device_availability: bool, // Device connect/disconnect notifications
+    pub show_switching_actions: bool,   // Device switching notifications
+
+    // Keep old field for backward compatibility
+    #[serde(alias = "show_device_changes")]
+    pub show_device_changes: Option<bool>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -60,11 +64,25 @@ impl Default for GeneralConfig {
     }
 }
 
+impl NotificationConfig {
+    /// Handle backward compatibility for old config files
+    pub fn migrate_from_old_config(mut self) -> Self {
+        // If old show_device_changes is present, use it for device availability
+        if let Some(old_value) = self.show_device_changes {
+            self.show_device_availability = old_value;
+        }
+        // Clear the compatibility field
+        self.show_device_changes = None;
+        self
+    }
+}
+
 impl Default for NotificationConfig {
     fn default() -> Self {
         Self {
-            show_device_changes: true,
-            show_switching_actions: true,
+            show_device_availability: false, // Default: no device availability notifications
+            show_switching_actions: true,    // Default: show switching notifications
+            show_device_changes: None,       // Backward compatibility field
         }
     }
 }
@@ -123,8 +141,11 @@ impl Config {
         let config_content = fs::read_to_string(&path)
             .with_context(|| format!("Failed to read configuration file: {}", path.display()))?;
 
-        let config: Config = toml::from_str(&config_content)
+        let mut config: Config = toml::from_str(&config_content)
             .with_context(|| format!("Failed to parse configuration file: {}", path.display()))?;
+
+        // Handle backward compatibility for notification config
+        config.notifications = config.notifications.migrate_from_old_config();
 
         info!("Configuration loaded successfully");
         Ok(config)
