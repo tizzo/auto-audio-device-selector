@@ -212,7 +212,6 @@ enum NotificationType {
 
 /// Reasons for device switching (for notification context)
 #[derive(Debug, Clone)]
-#[allow(dead_code)] // All variants kept for API completeness
 pub enum SwitchReason {
     HigherPriority,      // A higher priority device became available
     PreviousUnavailable, // Previous device became unavailable

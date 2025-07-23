@@ -6,3 +6,4 @@ pub mod system;
 
 pub use audio::AudioDeviceMonitor;
 pub use config::Config;
+pub use notifications::{NotificationManager, SwitchReason};
