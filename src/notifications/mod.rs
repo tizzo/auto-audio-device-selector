@@ -4,11 +4,58 @@ use tracing::{debug, error, info, warn};
 use crate::audio::AudioDevice;
 use crate::config::Config;
 
+/// Trait for sending notifications - allows for testing without system calls
+pub trait NotificationSender {
+    fn send(&self, title: &str, body: &str) -> Result<()>;
+}
+
+/// Production notification sender using macOS osascript
+pub struct MacOSNotificationSender;
+
+impl NotificationSender for MacOSNotificationSender {
+    fn send(&self, title: &str, body: &str) -> Result<()> {
+        send_native_macos_notification(title, body)
+    }
+}
+
+/// Test notification sender that doesn't actually send notifications
+pub struct TestNotificationSender {
+    pub sent_notifications: std::sync::Mutex<Vec<(String, String)>>,
+}
+
+impl TestNotificationSender {
+    pub fn new() -> Self {
+        Self {
+            sent_notifications: std::sync::Mutex::new(Vec::new()),
+        }
+    }
+
+    pub fn get_sent_notifications(&self) -> Vec<(String, String)> {
+        self.sent_notifications.lock().unwrap().clone()
+    }
+
+    pub fn clear(&self) {
+        self.sent_notifications.lock().unwrap().clear();
+    }
+}
+
+impl NotificationSender for TestNotificationSender {
+    fn send(&self, title: &str, body: &str) -> Result<()> {
+        debug!("Test notification: {} - {}", title, body);
+        self.sent_notifications
+            .lock()
+            .unwrap()
+            .push((title.to_string(), body.to_string()));
+        Ok(())
+    }
+}
+
 /// Manages system notifications for audio device events
-pub struct NotificationManager {
+pub struct NotificationManager<T: NotificationSender = MacOSNotificationSender> {
     enabled: bool,
     show_device_availability: bool, // Device connect/disconnect notifications
     show_switching_actions: bool,   // Device switching notifications
+    sender: T,
 }
 
 impl NotificationManager {
@@ -17,6 +64,18 @@ impl NotificationManager {
             enabled: true, // Can be controlled by config in the future
             show_device_availability: config.notifications.show_device_availability,
             show_switching_actions: config.notifications.show_switching_actions,
+            sender: MacOSNotificationSender,
+        }
+    }
+}
+
+impl<T: NotificationSender> NotificationManager<T> {
+    pub fn with_sender(config: &Config, sender: T) -> Self {
+        Self {
+            enabled: true,
+            show_device_availability: config.notifications.show_device_availability,
+            show_switching_actions: config.notifications.show_switching_actions,
+            sender,
         }
     }
 
@@ -117,7 +176,7 @@ impl NotificationManager {
         Ok(())
     }
 
-    /// Send a generic system notification using native macOS osascript
+    /// Send a generic system notification using the configured sender
     fn send_notification(
         &self,
         title: &str,
@@ -126,13 +185,9 @@ impl NotificationManager {
     ) -> Result<()> {
         debug!("Sending notification: {} - {}", title, body);
 
-        // Send notification using native macOS osascript
-        self.send_native_macos_notification(title, body)?;
+        self.sender.send(title, body)?;
 
-        debug!(
-            "Successfully sent notification via native macOS osascript: {}",
-            title
-        );
+        debug!("Successfully sent notification: {}", title);
         Ok(())
     }
 
@@ -159,11 +214,11 @@ impl NotificationManager {
         let title = "Audio Device Monitor";
         let body = "Notification system is working correctly!";
 
-        info!("Sending native macOS osascript notification...");
+        info!("Sending test notification...");
 
-        match self.send_native_macos_notification(title, body) {
+        match self.sender.send(title, body) {
             Ok(_) => {
-                info!("Native macOS notification sent successfully");
+                info!("Test notification sent successfully");
                 info!("Check your notifications (should appear in top-right corner)");
                 info!("This notification method works reliably for unsigned apps");
             }
@@ -179,26 +234,6 @@ impl NotificationManager {
 
         info!("Test notification completed");
         Ok(())
-    }
-
-    /// Send notification using native macOS osascript (more reliable for unsigned apps)
-    fn send_native_macos_notification(&self, title: &str, body: &str) -> Result<()> {
-        use std::process::Command;
-
-        let script = format!(
-            r#"display notification "{}" with title "{}" subtitle "" sound name """#,
-            body.replace('"', "\\\""),
-            title.replace('"', "\\\"")
-        );
-
-        let output = Command::new("osascript").args(["-e", &script]).output()?;
-
-        if output.status.success() {
-            Ok(())
-        } else {
-            let error = String::from_utf8_lossy(&output.stderr);
-            Err(anyhow::anyhow!("osascript failed: {}", error))
-        }
     }
 }
 
@@ -218,12 +253,33 @@ pub enum SwitchReason {
     Manual,              // User manually switched
 }
 
+/// Send notification using native macOS osascript (more reliable for unsigned apps)
+fn send_native_macos_notification(title: &str, body: &str) -> Result<()> {
+    use std::process::Command;
+
+    let script = format!(
+        r#"display notification "{}" with title "{}" subtitle "" sound name """#,
+        body.replace('"', "\\\""),
+        title.replace('"', "\\\"")
+    );
+
+    let output = Command::new("osascript").args(["-e", &script]).output()?;
+
+    if output.status.success() {
+        Ok(())
+    } else {
+        let error = String::from_utf8_lossy(&output.stderr);
+        Err(anyhow::anyhow!("osascript failed: {}", error))
+    }
+}
+
 impl Default for NotificationManager {
     fn default() -> Self {
         Self {
             enabled: true,
             show_device_availability: false, // Default: no device availability notifications
             show_switching_actions: true,    // Default: show switching notifications
+            sender: MacOSNotificationSender,
         }
     }
 }

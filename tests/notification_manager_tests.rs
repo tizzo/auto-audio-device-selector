@@ -1,14 +1,15 @@
+use audio_device_monitor::TestNotificationSender;
 use audio_device_monitor::config::{Config, GeneralConfig, NotificationConfig};
 use audio_device_monitor::notifications::{NotificationManager, SwitchReason};
 
 mod test_utils;
 use test_utils::AudioDeviceBuilder;
 
-/// Helper function to create notification manager with custom config
-fn create_notification_manager(
+/// Helper function to create notification manager with test sender (no system notifications)
+fn create_test_notification_manager(
     show_device_availability: bool,
     show_switching_actions: bool,
-) -> NotificationManager {
+) -> NotificationManager<TestNotificationSender> {
     let config = Config {
         general: GeneralConfig::default(),
         notifications: NotificationConfig {
@@ -20,7 +21,8 @@ fn create_notification_manager(
         input_devices: vec![],
     };
 
-    NotificationManager::new(&config)
+    let sender = TestNotificationSender::new();
+    NotificationManager::with_sender(&config, sender)
 }
 
 /// Test configuration-based notification filtering
@@ -30,32 +32,30 @@ mod configuration_filtering {
 
     #[test]
     fn test_device_availability_notifications_enabled() {
-        let manager = create_notification_manager(true, false);
+        let manager = create_test_notification_manager(true, false);
         let device = AudioDeviceBuilder::new()
             .name("Test Device")
             .output()
             .build();
 
-        // Should not panic or fail when availability notifications are enabled
-        // We can't test the actual notification sending without system calls,
-        // but we can verify the logic path is taken
+        // Should complete successfully when availability notifications are enabled
         let result_connected = manager.device_connected(&device);
         let result_disconnected = manager.device_disconnected(&device);
 
-        // Methods should complete successfully (even if notification fails internally)
-        assert!(result_connected.is_ok() || result_connected.is_err());
-        assert!(result_disconnected.is_ok() || result_disconnected.is_err());
+        // Both should succeed (using test sender, no actual notifications)
+        assert!(result_connected.is_ok());
+        assert!(result_disconnected.is_ok());
     }
 
     #[test]
     fn test_device_availability_notifications_disabled() {
-        let manager = create_notification_manager(false, false);
+        let manager = create_test_notification_manager(false, false);
         let device = AudioDeviceBuilder::new()
             .name("Test Device")
             .output()
             .build();
 
-        // When disabled, these should return Ok(()) immediately without system calls
+        // When disabled, these should return Ok(()) immediately without sending
         let result_connected = manager.device_connected(&device);
         let result_disconnected = manager.device_disconnected(&device);
 
@@ -65,7 +65,7 @@ mod configuration_filtering {
 
     #[test]
     fn test_switching_action_notifications_enabled() {
-        let manager = create_notification_manager(false, true);
+        let manager = create_test_notification_manager(false, true);
         let device = AudioDeviceBuilder::new()
             .name("Test Device")
             .output()
@@ -82,7 +82,7 @@ mod configuration_filtering {
 
     #[test]
     fn test_switching_action_notifications_disabled() {
-        let manager = create_notification_manager(false, false);
+        let manager = create_test_notification_manager(false, false);
         let device = AudioDeviceBuilder::new()
             .name("Test Device")
             .output()
@@ -98,7 +98,7 @@ mod configuration_filtering {
 
     #[test]
     fn test_all_notifications_enabled() {
-        let manager = create_notification_manager(true, true);
+        let manager = create_test_notification_manager(true, true);
         let device = AudioDeviceBuilder::new()
             .name("Test Device")
             .output()
@@ -114,13 +114,13 @@ mod configuration_filtering {
 
         // All should complete without panic (success/failure depends on system state)
         for result in results {
-            assert!(result.is_ok() || result.is_err());
+            assert!(result.is_ok());
         }
     }
 
     #[test]
     fn test_all_notifications_disabled() {
-        let manager = create_notification_manager(false, false);
+        let manager = create_test_notification_manager(false, false);
         let device = AudioDeviceBuilder::new()
             .name("Test Device")
             .output()
@@ -145,7 +145,7 @@ mod state_management {
 
     #[test]
     fn test_default_configuration() {
-        let default_manager = NotificationManager::default();
+        let default_manager = create_test_notification_manager(false, true); // Default values
 
         // Test that default values match documentation
         assert!(default_manager.is_enabled());
@@ -155,7 +155,7 @@ mod state_management {
 
     #[test]
     fn test_enable_disable_functionality() {
-        let mut manager = create_notification_manager(true, true);
+        let mut manager = create_test_notification_manager(true, true);
 
         // Test initial state
         assert!(manager.is_enabled());
@@ -180,7 +180,7 @@ mod state_management {
         ];
 
         for (availability, switching) in configs {
-            let manager = create_notification_manager(availability, switching);
+            let manager = create_test_notification_manager(availability, switching);
             // Manager should be created successfully with any valid config
             assert!(manager.is_enabled()); // Should be enabled by default
         }
@@ -195,38 +195,31 @@ mod device_type_formatting {
 
     #[test]
     fn test_output_device_emoji_selection() {
-        let manager = create_notification_manager(true, true);
+        let manager = create_test_notification_manager(true, true);
         let output_device = AudioDeviceBuilder::new()
             .name("Output Device")
             .output()
             .build();
 
-        // We can't directly test emoji selection without exposing internal methods,
-        // but we can verify the methods complete successfully with output devices
-        assert!(
-            manager.device_connected(&output_device).is_ok()
-                || manager.device_connected(&output_device).is_err()
-        );
+        // Using test sender, methods should complete successfully with output devices
+        assert!(manager.device_connected(&output_device).is_ok());
     }
 
     #[test]
     fn test_input_device_emoji_selection() {
-        let manager = create_notification_manager(true, true);
+        let manager = create_test_notification_manager(true, true);
         let input_device = AudioDeviceBuilder::new()
             .name("Input Device")
             .input()
             .build();
 
-        // Verify methods work with input devices
-        assert!(
-            manager.device_disconnected(&input_device).is_ok()
-                || manager.device_disconnected(&input_device).is_err()
-        );
+        // Using test sender, methods should work with input devices
+        assert!(manager.device_disconnected(&input_device).is_ok());
     }
 
     #[test]
     fn test_input_output_device_emoji_selection() {
-        let manager = create_notification_manager(true, true);
+        let manager = create_test_notification_manager(true, true);
 
         // Create a device with InputOutput type using the builder
         let mut device = AudioDeviceBuilder::new()
@@ -237,14 +230,11 @@ mod device_type_formatting {
         // Manually set to InputOutput type since builder doesn't have this method
         device.device_type = DeviceType::InputOutput;
 
-        // Verify methods work with input/output devices
+        // Using test sender, methods should work with input/output devices
         assert!(
             manager
                 .device_switched(&device, SwitchReason::HigherPriority)
                 .is_ok()
-                || manager
-                    .device_switched(&device, SwitchReason::HigherPriority)
-                    .is_err()
         );
     }
 }
@@ -256,7 +246,7 @@ mod switch_reason_formatting {
 
     #[test]
     fn test_higher_priority_switch_reason() {
-        let manager = create_notification_manager(false, true);
+        let manager = create_test_notification_manager(false, true);
         let device = AudioDeviceBuilder::new()
             .name("Priority Device")
             .output()
@@ -264,36 +254,36 @@ mod switch_reason_formatting {
 
         let result = manager.device_switched(&device, SwitchReason::HigherPriority);
         // Should complete successfully (the specific message format is internal)
-        assert!(result.is_ok() || result.is_err());
+        assert!(result.is_ok());
     }
 
     #[test]
     fn test_previous_unavailable_switch_reason() {
-        let manager = create_notification_manager(false, true);
+        let manager = create_test_notification_manager(false, true);
         let device = AudioDeviceBuilder::new()
             .name("Fallback Device")
             .input()
             .build();
 
         let result = manager.device_switched(&device, SwitchReason::PreviousUnavailable);
-        assert!(result.is_ok() || result.is_err());
+        assert!(result.is_ok());
     }
 
     #[test]
     fn test_manual_switch_reason() {
-        let manager = create_notification_manager(false, true);
+        let manager = create_test_notification_manager(false, true);
         let device = AudioDeviceBuilder::new()
             .name("Manual Device")
             .output()
             .build();
 
         let result = manager.device_switched(&device, SwitchReason::Manual);
-        assert!(result.is_ok() || result.is_err());
+        assert!(result.is_ok());
     }
 
     #[test]
     fn test_all_switch_reasons_with_different_device_types() {
-        let manager = create_notification_manager(false, true);
+        let manager = create_test_notification_manager(false, true);
         let reasons = vec![
             SwitchReason::HigherPriority,
             SwitchReason::PreviousUnavailable,
@@ -307,7 +297,7 @@ mod switch_reason_formatting {
                 .build();
 
             let result = manager.device_switched(&device, reason);
-            assert!(result.is_ok() || result.is_err());
+            assert!(result.is_ok());
         }
     }
 }
@@ -319,88 +309,76 @@ mod edge_cases {
 
     #[test]
     fn test_empty_device_name() {
-        let manager = create_notification_manager(true, true);
+        let manager = create_test_notification_manager(true, true);
         let device = AudioDeviceBuilder::new().name("").output().build();
 
-        // Should handle empty device names gracefully
-        assert!(
-            manager.device_connected(&device).is_ok() || manager.device_connected(&device).is_err()
-        );
+        // Using test sender, should handle empty device names gracefully
+        assert!(manager.device_connected(&device).is_ok());
         assert!(
             manager
                 .device_switched(&device, SwitchReason::Manual)
                 .is_ok()
-                || manager
-                    .device_switched(&device, SwitchReason::Manual)
-                    .is_err()
         );
     }
 
     #[test]
     fn test_unicode_device_name() {
-        let manager = create_notification_manager(true, true);
+        let manager = create_test_notification_manager(true, true);
         let device = AudioDeviceBuilder::new()
             .name("🎵 音频设备 🎵")
             .output()
             .build();
 
-        // Should handle Unicode device names
-        assert!(
-            manager.device_disconnected(&device).is_ok()
-                || manager.device_disconnected(&device).is_err()
-        );
+        // Using test sender, should handle Unicode device names
+        assert!(manager.device_disconnected(&device).is_ok());
     }
 
     #[test]
     fn test_very_long_device_name() {
-        let manager = create_notification_manager(true, true);
+        let manager = create_test_notification_manager(true, true);
         let long_name = "A".repeat(1000);
         let device = AudioDeviceBuilder::new().name(&long_name).input().build();
 
-        // Should handle very long device names
-        assert!(
-            manager.device_connected(&device).is_ok() || manager.device_connected(&device).is_err()
-        );
+        // Using test sender, should handle very long device names
+        assert!(manager.device_connected(&device).is_ok());
     }
 
     #[test]
     fn test_special_characters_in_device_name() {
-        let manager = create_notification_manager(true, true);
+        let manager = create_test_notification_manager(true, true);
         let special_name = r#"Device "with" 'quotes' & <html> characters"#;
         let device = AudioDeviceBuilder::new()
             .name(special_name)
             .output()
             .build();
 
-        // Should handle special characters that might affect notification display
-        assert!(
-            manager.device_connected(&device).is_ok() || manager.device_connected(&device).is_err()
-        );
+        // Using test sender, should handle special characters
+        assert!(manager.device_connected(&device).is_ok());
     }
 
     #[test]
     fn test_switch_failed_with_empty_error() {
-        let manager = create_notification_manager(false, true);
+        let manager = create_test_notification_manager(false, true);
 
         let result = manager.switch_failed("Device Name", "");
-        assert!(result.is_ok() || result.is_err());
+        assert!(result.is_ok());
     }
 
     #[test]
     fn test_switch_failed_with_long_error() {
-        let manager = create_notification_manager(false, true);
+        let manager = create_test_notification_manager(false, true);
         let long_error = "Error message ".repeat(100);
 
         let result = manager.switch_failed("Device", &long_error);
-        assert!(result.is_ok() || result.is_err());
+        assert!(result.is_ok());
     }
 
     #[test]
     fn test_switch_failed_with_unicode_error() {
-        let manager = create_notification_manager(false, true);
+        let manager = create_test_notification_manager(false, true);
 
         let result = manager.switch_failed("Device", "错误消息: 设备不可用 🚫");
-        assert!(result.is_ok() || result.is_err());
+        assert!(result.is_ok());
     }
 }
 
@@ -411,22 +389,22 @@ mod test_notifications {
 
     #[test]
     fn test_notification_test_method() {
-        let manager = create_notification_manager(true, true);
+        let manager = create_test_notification_manager(true, true);
 
         // Test notification should complete (may succeed or fail based on system state)
         let result = manager.test_notification();
-        assert!(result.is_ok() || result.is_err());
+        assert!(result.is_ok());
     }
 
     #[test]
     fn test_notification_with_disabled_manager() {
-        let mut manager = create_notification_manager(true, true);
+        let mut manager = create_test_notification_manager(true, true);
         manager.set_enabled(false);
 
         // Even when manager is disabled, test notification should still work
         // (test_notification bypasses the enabled check)
         let result = manager.test_notification();
-        assert!(result.is_ok() || result.is_err());
+        assert!(result.is_ok());
     }
 }
 
@@ -438,7 +416,8 @@ mod configuration_integration {
     #[test]
     fn test_create_from_default_config() {
         let config = Config::default();
-        let manager = NotificationManager::new(&config);
+        let sender = TestNotificationSender::new();
+        let manager = NotificationManager::with_sender(&config, sender);
 
         // Should create successfully from default config
         assert!(manager.is_enabled());
@@ -450,7 +429,8 @@ mod configuration_integration {
         config.notifications.show_device_availability = true;
         config.notifications.show_switching_actions = false;
 
-        let manager = NotificationManager::new(&config);
+        let sender = TestNotificationSender::new();
+        let manager = NotificationManager::with_sender(&config, sender);
         assert!(manager.is_enabled());
 
         // Test behavior with custom configuration
@@ -461,7 +441,7 @@ mod configuration_integration {
 
         // Availability notifications should work (enabled)
         let availability_result = manager.device_connected(&device);
-        assert!(availability_result.is_ok() || availability_result.is_err());
+        assert!(availability_result.is_ok());
 
         // Switching notifications should be skipped (disabled) - should return Ok(())
         let switching_result = manager.device_switched(&device, SwitchReason::Manual);
@@ -477,7 +457,8 @@ mod configuration_integration {
             config.notifications.show_device_availability = availability;
             config.notifications.show_switching_actions = switching;
 
-            let manager = NotificationManager::new(&config);
+            let sender = TestNotificationSender::new();
+            let manager = NotificationManager::with_sender(&config, sender);
             assert!(manager.is_enabled());
 
             // All managers should be creatable regardless of config
