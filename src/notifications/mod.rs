@@ -258,7 +258,7 @@ fn send_native_macos_notification(title: &str, body: &str) -> Result<()> {
     use std::process::Command;
 
     let script = format!(
-        r#"display notification "{}" with title "{}" subtitle "" sound name """#,
+        r#"display notification "{}" with title "{}" subtitle """#,
         body.replace('"', "\\\""),
         title.replace('"', "\\\"")
     );
