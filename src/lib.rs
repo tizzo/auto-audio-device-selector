@@ -4,7 +4,7 @@ pub mod notifications;
 pub mod priority;
 pub mod system;
 
-pub use audio::AudioDeviceMonitor;
+pub use audio::{AudioDeviceMonitor, DeviceControllerV2};
 pub use config::Config;
 pub use notifications::{NotificationManager, SwitchReason, TestNotificationSender};
 
