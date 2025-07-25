@@ -5,7 +5,7 @@ pub mod priority;
 pub mod system;
 
 pub use audio::{AudioDeviceMonitor, DeviceControllerV2};
-pub use config::Config;
+pub use config::{Config, ConfigLoader};
 pub use notifications::{NotificationManager, SwitchReason, TestNotificationSender};
 
 // Export system traits and adapters

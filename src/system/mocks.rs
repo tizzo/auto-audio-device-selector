@@ -171,6 +171,7 @@ impl Default for MockAudioSystem {
 }
 
 /// Mock file system for testing - provides controllable file operations
+#[derive(Clone)]
 pub struct MockFileSystem {
     pub files: Arc<Mutex<HashMap<PathBuf, String>>>,
     pub read_calls: Arc<Mutex<Vec<PathBuf>>>,
