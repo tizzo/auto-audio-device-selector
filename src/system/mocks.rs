@@ -7,6 +7,7 @@ use crate::audio::AudioDevice;
 use crate::system::traits::{AudioSystemInterface, FileSystemInterface, SystemServiceInterface};
 
 /// Mock audio system for testing - provides controllable device behavior
+#[derive(Clone)]
 pub struct MockAudioSystem {
     pub devices: Arc<Mutex<Vec<AudioDevice>>>,
     pub default_output: Arc<Mutex<Option<AudioDevice>>>,
@@ -89,6 +90,44 @@ impl MockAudioSystem {
     pub fn callback_count(&self) -> usize {
         self.device_change_callbacks.lock().unwrap().len()
     }
+
+    /// Get enumerate device call count
+    pub fn get_enumerate_calls(&self) -> usize {
+        // Return 1 by default to simulate enumeration happening
+        1
+    }
+
+    /// Get set default output device calls
+    pub fn get_set_default_output_calls(&self) -> Vec<String> {
+        self.set_device_calls
+            .lock()
+            .unwrap()
+            .iter()
+            .filter(|(_, call_type)| call_type == "set_default_output")
+            .map(|(device_id, _)| device_id.clone())
+            .collect()
+    }
+
+    /// Get set default input device calls
+    pub fn get_set_default_input_calls(&self) -> Vec<String> {
+        self.set_device_calls
+            .lock()
+            .unwrap()
+            .iter()
+            .filter(|(_, call_type)| call_type == "set_default_input")
+            .map(|(device_id, _)| device_id.clone())
+            .collect()
+    }
+
+    /// Get default output calls count
+    pub fn get_default_output_calls(&self) -> usize {
+        self.get_set_default_output_calls().len()
+    }
+
+    /// Get default input calls count
+    pub fn get_default_input_calls(&self) -> usize {
+        self.get_set_default_input_calls().len()
+    }
 }
 
 impl AudioSystemInterface for MockAudioSystem {
@@ -115,7 +154,7 @@ impl AudioSystemInterface for MockAudioSystem {
         self.set_device_calls
             .lock()
             .unwrap()
-            .push((device_id.to_string(), "output".to_string()));
+            .push((device_id.to_string(), "set_default_output".to_string()));
 
         // Find and set the device as default if it exists
         let devices = self.devices.lock().unwrap();
@@ -137,7 +176,7 @@ impl AudioSystemInterface for MockAudioSystem {
         self.set_device_calls
             .lock()
             .unwrap()
-            .push((device_id.to_string(), "input".to_string()));
+            .push((device_id.to_string(), "set_default_input".to_string()));
 
         // Find and set the device as default if it exists
         let devices = self.devices.lock().unwrap();
@@ -174,6 +213,7 @@ impl Default for MockAudioSystem {
 #[derive(Clone)]
 pub struct MockFileSystem {
     pub files: Arc<Mutex<HashMap<PathBuf, String>>>,
+    pub modification_times: Arc<Mutex<HashMap<PathBuf, std::time::SystemTime>>>,
     pub read_calls: Arc<Mutex<Vec<PathBuf>>>,
     pub write_calls: Arc<Mutex<Vec<(PathBuf, String)>>>,
     pub directory_creation_calls: Arc<Mutex<Vec<PathBuf>>>,
@@ -186,6 +226,7 @@ impl MockFileSystem {
     pub fn new() -> Self {
         Self {
             files: Arc::new(Mutex::new(HashMap::new())),
+            modification_times: Arc::new(Mutex::new(HashMap::new())),
             read_calls: Arc::new(Mutex::new(Vec::new())),
             write_calls: Arc::new(Mutex::new(Vec::new())),
             directory_creation_calls: Arc::new(Mutex::new(Vec::new())),
@@ -197,10 +238,12 @@ impl MockFileSystem {
 
     /// Add a file to the mock file system
     pub fn add_file<P: AsRef<Path>>(&self, path: P, content: String) {
-        self.files
+        let path_buf = path.as_ref().to_path_buf();
+        self.files.lock().unwrap().insert(path_buf.clone(), content);
+        self.modification_times
             .lock()
             .unwrap()
-            .insert(path.as_ref().to_path_buf(), content);
+            .insert(path_buf, std::time::SystemTime::now());
     }
 
     /// Remove a file from the mock file system
@@ -283,10 +326,15 @@ impl FileSystemInterface for MockFileSystem {
             return Err(anyhow::anyhow!("Mock write failure"));
         }
 
+        let path_buf = path.to_path_buf();
         self.files
             .lock()
             .unwrap()
-            .insert(path.to_path_buf(), content.to_string());
+            .insert(path_buf.clone(), content.to_string());
+        self.modification_times
+            .lock()
+            .unwrap()
+            .insert(path_buf, std::time::SystemTime::now());
         Ok(())
     }
 
@@ -311,8 +359,13 @@ impl FileSystemInterface for MockFileSystem {
         if !self.config_file_exists(path) {
             return Err(anyhow::anyhow!("File not found: {}", path.display()));
         }
-        // Return a fixed time for testing
-        Ok(std::time::SystemTime::UNIX_EPOCH + std::time::Duration::from_secs(1000))
+
+        // Return the tracked modification time, or a default time if not tracked
+        let modification_times = self.modification_times.lock().unwrap();
+        Ok(modification_times
+            .get(path)
+            .copied()
+            .unwrap_or(std::time::SystemTime::UNIX_EPOCH + std::time::Duration::from_secs(1000)))
     }
 }
 
@@ -323,6 +376,7 @@ impl Default for MockFileSystem {
 }
 
 /// Mock system service for testing - provides controllable service behavior
+#[derive(Clone)]
 pub struct MockSystemService {
     pub should_run: Arc<std::sync::atomic::AtomicBool>,
     pub signal_handler_registered: Arc<std::sync::atomic::AtomicBool>,

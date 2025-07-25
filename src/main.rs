@@ -11,10 +11,10 @@ mod service;
 mod system;
 
 use audio::AudioDeviceMonitor;
-use config::Config;
+use config::{Config, ConfigLoader};
 use logging::{LoggingConfig, cleanup_old_logs, get_default_log_dir, initialize_logging};
 use notifications::NotificationManager;
-use service::{ServiceManager, daemon::ServiceInstaller};
+use service::{AudioDeviceService, ServiceManager, daemon::ServiceInstaller};
 
 #[derive(Parser)]
 #[command(name = "audio-device-monitor")]
@@ -76,6 +76,8 @@ enum Commands {
     UninstallService,
     /// Run as a background service (enhanced daemon)
     Service,
+    /// Run with dependency injection architecture (new service)
+    ServiceV2,
     /// Clean up old log files
     CleanupLogs {
         /// Number of days to keep (default: 30)
@@ -141,6 +143,9 @@ async fn main() -> Result<()> {
         }
         Some(Commands::Service) => {
             run_service(config).await?;
+        }
+        Some(Commands::ServiceV2) => {
+            run_service_v2(cli.config.as_deref()).await?;
         }
         Some(Commands::CleanupLogs { keep_days }) => {
             cleanup_logs(keep_days)?;
@@ -382,6 +387,30 @@ async fn run_service(config: Config) -> Result<()> {
     service_manager.start().await?;
 
     println!("Service stopped");
+    Ok(())
+}
+
+async fn run_service_v2(config_path: Option<&str>) -> Result<()> {
+    info!("Starting dependency injection service mode");
+
+    // Create the service with either custom or default config path
+    let mut service = if let Some(path) = config_path {
+        let config_path = std::path::PathBuf::from(path);
+        AudioDeviceService::new_production(config_path)?
+    } else {
+        AudioDeviceService::new_with_default_config()?
+    };
+
+    println!("Audio device monitor service (v2) starting...");
+    println!("  Dependency injection architecture enabled");
+    println!("  Complete system abstraction for testing");
+    println!("  Send SIGTERM or SIGINT to stop gracefully");
+    println!("  Configuration hot reload supported");
+
+    // Start the service (this will block until shutdown)
+    service.start()?;
+
+    println!("Service v2 stopped");
     Ok(())
 }
 
