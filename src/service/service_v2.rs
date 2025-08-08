@@ -168,17 +168,20 @@ impl<A: AudioSystemInterface, F: FileSystemInterface, S: SystemServiceInterface>
         info!("Manually handling device disconnection: {}", device_name);
 
         // For disconnect, we need to check current devices before they're removed
-        if let Some(current_output) = self.device_controller.get_current_output_device() {
+        let current_output_device = self.device_controller.get_current_output_device().cloned();
+        let current_input_device = self.device_controller.get_current_input_device().cloned();
+
+        if let Some(current_output) = current_output_device {
             if current_output.name == device_name {
                 self.device_controller
-                    .handle_device_disconnected(current_output)?;
+                    .handle_device_disconnected(&current_output)?;
             }
         }
 
-        if let Some(current_input) = self.device_controller.get_current_input_device() {
+        if let Some(current_input) = current_input_device {
             if current_input.name == device_name {
                 self.device_controller
-                    .handle_device_disconnected(current_input)?;
+                    .handle_device_disconnected(&current_input)?;
             }
         }
 

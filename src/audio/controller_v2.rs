@@ -6,7 +6,7 @@ use crate::notifications::{NotificationManager, SwitchReason};
 use crate::priority::DevicePriorityManager;
 use crate::system::AudioSystemInterface;
 
-use super::device::{AudioDevice, DeviceInfo};
+use super::device::{AudioDevice, DeviceInfo, DeviceType};
 
 /// Refactored DeviceController that accepts an AudioSystemInterface for dependency injection
 pub struct DeviceController<A: AudioSystemInterface> {
@@ -32,10 +32,7 @@ impl<A: AudioSystemInterface> DeviceController<A> {
     pub fn initialize(&mut self) -> Result<()> {
         info!("Initializing device controller with dependency injection");
 
-        // Set initial devices
-        self.update_current_devices()?;
-
-        // Set up device change monitoring
+        // Set up device change monitoring without setting initial devices
         self.start_monitoring()?;
 
         info!("Device controller initialization complete");
@@ -63,29 +60,44 @@ impl<A: AudioSystemInterface> DeviceController<A> {
     pub fn update_current_devices(&mut self) -> Result<()> {
         debug!("Updating current device state");
 
-        // Get all available devices
-        let available_devices = self.audio_system.enumerate_devices()?;
-        debug!("Found {} available devices", available_devices.len());
-
-        // Find the best output device
-        let best_output = self
-            .priority_manager
-            .find_best_output_device(&available_devices);
-        if let Some(ref device) = best_output {
-            if self.current_output.as_ref().map(|d| &d.id) != Some(&device.id) {
-                info!("Switching to output device: {}", device.name);
-                self.switch_to_output_device(device)?;
+        // First, check system defaults and sync our internal state
+        if let Ok(Some(system_output)) = self.audio_system.get_default_output_device() {
+            if self.current_output.as_ref().map(|d| &d.id) != Some(&system_output.id) {
+                self.current_output = Some(system_output);
             }
         }
 
-        // Find the best input device
-        let best_input = self
-            .priority_manager
-            .find_best_input_device(&available_devices);
-        if let Some(ref device) = best_input {
-            if self.current_input.as_ref().map(|d| &d.id) != Some(&device.id) {
-                info!("Switching to input device: {}", device.name);
-                self.switch_to_input_device(device)?;
+        if let Ok(Some(system_input)) = self.audio_system.get_default_input_device() {
+            if self.current_input.as_ref().map(|d| &d.id) != Some(&system_input.id) {
+                self.current_input = Some(system_input);
+            }
+        }
+
+        // Only use priority-based switching if no current device is set
+        if self.current_output.is_none() || self.current_input.is_none() {
+            let available_devices = self.audio_system.enumerate_devices()?;
+            debug!("Found {} available devices", available_devices.len());
+
+            // Find the best output device if none is current
+            if self.current_output.is_none() {
+                let best_output = self
+                    .priority_manager
+                    .find_best_output_device(&available_devices);
+                if let Some(ref device) = best_output {
+                    info!("Switching to output device: {}", device.name);
+                    self.switch_to_output_device(device)?;
+                }
+            }
+
+            // Find the best input device if none is current
+            if self.current_input.is_none() {
+                let best_input = self
+                    .priority_manager
+                    .find_best_input_device(&available_devices);
+                if let Some(ref device) = best_input {
+                    info!("Switching to input device: {}", device.name);
+                    self.switch_to_input_device(device)?;
+                }
             }
         }
 
@@ -196,18 +208,106 @@ impl<A: AudioSystemInterface> DeviceController<A> {
     }
 
     /// Handle a device being connected (for external notification)
-    pub fn handle_device_connected(&self, device: &AudioDevice) -> Result<()> {
+    pub fn handle_device_connected(&mut self, device: &AudioDevice) -> Result<()> {
+        // Send notification first
         if let Err(e) = self.notification_manager.device_connected(device) {
             error!("Failed to send device connected notification: {}", e);
         }
+
+        // Check if this newly connected device should become the current device
+        // based on priority rules
+        let available_devices = self.audio_system.enumerate_devices()?;
+        
+        match device.device_type {
+            DeviceType::Output => {
+                let best_output = self.priority_manager.find_best_output_device(&available_devices);
+                if let Some(ref best_device) = best_output {
+                    // If the best device is different from current, switch to it
+                    if self.current_output.as_ref().map(|d| &d.id) != Some(&best_device.id) {
+                        info!("Switching to newly connected high-priority output device: {}", best_device.name);
+                        self.switch_to_output_device(best_device)?;
+                    }
+                }
+            },
+            DeviceType::Input => {
+                let best_input = self.priority_manager.find_best_input_device(&available_devices);
+                if let Some(ref best_device) = best_input {
+                    // If the best device is different from current, switch to it
+                    if self.current_input.as_ref().map(|d| &d.id) != Some(&best_device.id) {
+                        info!("Switching to newly connected high-priority input device: {}", best_device.name);
+                        self.switch_to_input_device(best_device)?;
+                    }
+                }
+            },
+            DeviceType::InputOutput => {
+                // Handle devices that support both input and output
+                let best_output = self.priority_manager.find_best_output_device(&available_devices);
+                if let Some(ref best_device) = best_output {
+                    if self.current_output.as_ref().map(|d| &d.id) != Some(&best_device.id) {
+                        info!("Switching to newly connected high-priority output device: {}", best_device.name);
+                        self.switch_to_output_device(best_device)?;
+                    }
+                }
+                
+                let best_input = self.priority_manager.find_best_input_device(&available_devices);
+                if let Some(ref best_device) = best_input {
+                    if self.current_input.as_ref().map(|d| &d.id) != Some(&best_device.id) {
+                        info!("Switching to newly connected high-priority input device: {}", best_device.name);
+                        self.switch_to_input_device(best_device)?;
+                    }
+                }
+            },
+        }
+
         Ok(())
     }
 
     /// Handle a device being disconnected (for external notification)
-    pub fn handle_device_disconnected(&self, device: &AudioDevice) -> Result<()> {
+    pub fn handle_device_disconnected(&mut self, device: &AudioDevice) -> Result<()> {
+        let mut cleared_current_device = false;
+        
+        // Clear internal state if this was the current device
+        if self.current_output.as_ref().map(|d| &d.id) == Some(&device.id) {
+            info!("Clearing current output device: {}", device.name);
+            self.current_output = None;
+            cleared_current_device = true;
+        }
+        if self.current_input.as_ref().map(|d| &d.id) == Some(&device.id) {
+            info!("Clearing current input device: {}", device.name);
+            self.current_input = None;
+            cleared_current_device = true;
+        }
+
+        // Send notification
         if let Err(e) = self.notification_manager.device_disconnected(device) {
             error!("Failed to send device disconnected notification: {}", e);
         }
+
+        // Only re-evaluate if we cleared a current device and want to find alternatives
+        // In this implementation, we assume the device is truly disconnected and shouldn't
+        // be re-selected even if it appears available in enumerate_devices
+        if cleared_current_device {
+            // Find alternative devices from available ones, excluding the disconnected device
+            let available_devices = self.audio_system.enumerate_devices()?
+                .into_iter()
+                .filter(|d| d.id != device.id && d.name != device.name)
+                .collect::<Vec<_>>();
+            
+            if self.current_output.is_none() && device.device_type == DeviceType::Output {
+                if let Some(best_output) = self.priority_manager.find_best_output_device(&available_devices) {
+                    info!("Switching to alternative output device: {}", best_output.name);
+                    self.switch_to_output_device(&best_output)?;
+                }
+            }
+            
+            if self.current_input.is_none() && device.device_type == DeviceType::Input {
+                if let Some(best_input) = self.priority_manager.find_best_input_device(&available_devices) {
+                    info!("Switching to alternative input device: {}", best_input.name);
+                    self.switch_to_input_device(&best_input)?;
+                }
+            }
+        }
+
         Ok(())
     }
 
