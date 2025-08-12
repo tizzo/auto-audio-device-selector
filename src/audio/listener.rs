@@ -10,13 +10,13 @@ use tracing::{debug, error, info, warn};
 use super::AudioDevice;
 use super::controller::DeviceController;
 use crate::config::Config;
-use crate::notifications::{NotificationManager, SwitchReason};
+use crate::notifications::{DefaultNotificationManager, SwitchReason};
 use crate::priority::DevicePriorityManager;
 
 pub struct CoreAudioListener {
     controller: DeviceController,
     priority_manager: Arc<Mutex<DevicePriorityManager>>,
-    notification_manager: NotificationManager,
+    notification_manager: DefaultNotificationManager,
     device_list_address: AudioObjectPropertyAddress,
     default_output_address: AudioObjectPropertyAddress,
     default_input_address: AudioObjectPropertyAddress,
@@ -29,7 +29,7 @@ impl CoreAudioListener {
 
         let controller = DeviceController::new()?;
         let priority_manager = Arc::new(Mutex::new(DevicePriorityManager::new(config)));
-        let notification_manager = NotificationManager::new(config);
+        let notification_manager = DefaultNotificationManager::new(config);
 
         // Property addresses for listening to device changes
         let device_list_address = AudioObjectPropertyAddress {

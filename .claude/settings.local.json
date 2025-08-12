@@ -10,7 +10,10 @@
       "Bash(./test_matching)",
       "Bash(grep:*)",
       "Bash(git add:*)",
-      "Bash(rg:*)"
+      "Bash(rg:*)",
+      "Bash(time cargo test --test device_controller_integration_tests --quiet)",
+      "Bash(git checkout:*)",
+      "Bash(time cargo test --quiet)"
     ],
     "deny": []
   }

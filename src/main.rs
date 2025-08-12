@@ -13,7 +13,7 @@ mod system;
 use audio::AudioDeviceMonitor;
 use config::Config;
 use logging::{LoggingConfig, cleanup_old_logs, get_default_log_dir, initialize_logging};
-use notifications::NotificationManager;
+use notifications::DefaultNotificationManager;
 use service::{AudioDeviceService, daemon::ServiceInstaller};
 
 #[derive(Parser)]
@@ -313,7 +313,7 @@ async fn switch_device(device_name: &str, is_input: bool) -> Result<()> {
 
     let controller = audio::controller::DeviceController::new()?;
     let config = Config::load(None)?;
-    let notification_manager = NotificationManager::new(&config);
+    let notification_manager = DefaultNotificationManager::new(&config);
 
     println!(
         "Switching {} device to: {}",
@@ -412,7 +412,7 @@ fn test_notification() -> Result<()> {
     info!("Testing notification system");
 
     let config = Config::load(None)?;
-    let notification_manager = NotificationManager::new(&config);
+    let notification_manager = DefaultNotificationManager::new(&config);
 
     println!("🔔 Testing macOS Notification System");
     println!("=====================================");

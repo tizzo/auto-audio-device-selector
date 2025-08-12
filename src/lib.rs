@@ -7,7 +7,7 @@ pub mod system;
 
 pub use audio::{AudioDevice, AudioDeviceMonitor, DeviceControllerV2, DeviceType};
 pub use config::{Config, ConfigLoader};
-pub use notifications::{NotificationManager, SwitchReason};
+pub use notifications::{DefaultNotificationManager, NotificationManager, SwitchReason};
 
 #[cfg(any(test, feature = "test-mocks"))]
 pub use notifications::TestNotificationSender;

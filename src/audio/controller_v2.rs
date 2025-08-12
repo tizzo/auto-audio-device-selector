@@ -2,7 +2,7 @@ use anyhow::Result;
 use tracing::{debug, error, info};
 
 use crate::config::Config;
-use crate::notifications::{NotificationManager, SwitchReason};
+use crate::notifications::{DefaultNotificationManager, SwitchReason};
 use crate::priority::DevicePriorityManager;
 use crate::system::AudioSystemInterface;
 
@@ -12,7 +12,7 @@ use super::device::{AudioDevice, DeviceInfo, DeviceType};
 pub struct DeviceController<A: AudioSystemInterface> {
     audio_system: A,
     priority_manager: DevicePriorityManager,
-    notification_manager: NotificationManager,
+    notification_manager: DefaultNotificationManager,
     current_output: Option<AudioDevice>,
     current_input: Option<AudioDevice>,
 }
@@ -22,7 +22,7 @@ impl<A: AudioSystemInterface> DeviceController<A> {
         Self {
             audio_system,
             priority_manager: DevicePriorityManager::new(config),
-            notification_manager: NotificationManager::new(config),
+            notification_manager: DefaultNotificationManager::new(config),
             current_output: None,
             current_input: None,
         }

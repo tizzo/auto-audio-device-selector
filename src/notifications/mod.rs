@@ -4,6 +4,13 @@ use tracing::{debug, error, info, warn};
 use crate::audio::AudioDevice;
 use crate::config::Config;
 
+// Type alias for the default notification manager type
+#[cfg(not(any(test, feature = "test-mocks")))]
+pub type DefaultNotificationManager = NotificationManager<MacOSNotificationSender>;
+
+#[cfg(any(test, feature = "test-mocks"))]
+pub type DefaultNotificationManager = NotificationManager<TestNotificationSender>;
+
 /// Trait for sending notifications - allows for testing without system calls
 pub trait NotificationSender {
     fn send(&self, title: &str, body: &str) -> Result<()>;
@@ -64,13 +71,28 @@ pub struct NotificationManager<T: NotificationSender = MacOSNotificationSender> 
     sender: T,
 }
 
-impl NotificationManager {
+impl DefaultNotificationManager {
     pub fn new(config: &Config) -> Self {
-        Self {
-            enabled: true, // Can be controlled by config in the future
-            show_device_availability: config.notifications.show_device_availability,
-            show_switching_actions: config.notifications.show_switching_actions,
-            sender: MacOSNotificationSender,
+        #[cfg(not(any(test, feature = "test-mocks")))]
+        {
+            // In production, use real macOS notifications
+            Self {
+                enabled: true, // Can be controlled by config in the future
+                show_device_availability: config.notifications.show_device_availability,
+                show_switching_actions: config.notifications.show_switching_actions,
+                sender: MacOSNotificationSender,
+            }
+        }
+        #[cfg(any(test, feature = "test-mocks"))]
+        {
+            // During tests, use TestNotificationSender to avoid real macOS notifications
+            let test_sender = TestNotificationSender::new();
+            Self {
+                enabled: true,
+                show_device_availability: config.notifications.show_device_availability,
+                show_switching_actions: config.notifications.show_switching_actions,
+                sender: test_sender,
+            }
         }
     }
 }
