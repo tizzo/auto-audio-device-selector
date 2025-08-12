@@ -13,10 +13,14 @@ use crate::config::Config;
 pub struct ServiceManager {
     config: Config,
     signal_handler: SignalHandler,
+    // Used by the service lifecycle management system for device monitoring
+    #[allow(dead_code)]
     monitor: Option<AudioDeviceMonitor>,
 }
 
 impl ServiceManager {
+    // Called by legacy service systems that need tokio-based background service management
+    #[allow(dead_code)]
     pub fn new(config: Config) -> Self {
         Self {
             config,
@@ -26,6 +30,8 @@ impl ServiceManager {
     }
 
     /// Start the background service
+    // Called by legacy service launcher for tokio-based background service execution
+    #[allow(dead_code)]
     pub async fn start(&mut self) -> Result<()> {
         info!("Starting audio device monitor service");
 
@@ -92,6 +98,8 @@ impl ServiceManager {
     }
 
     /// Shutdown the service gracefully
+    // Called by signal handlers and cleanup routines for graceful service shutdown
+    #[allow(dead_code)]
     pub async fn shutdown(&self) -> Result<()> {
         info!("Shutting down audio device monitor service");
 
@@ -116,6 +124,8 @@ impl ServiceManager {
     }
 
     /// Reload configuration (for SIGHUP support)
+    // Called by signal handlers when SIGHUP is received for configuration hot-reload
+    #[allow(dead_code)]
     pub async fn reload_config(&mut self, config_path: Option<&str>) -> Result<()> {
         info!("Reloading configuration");
 

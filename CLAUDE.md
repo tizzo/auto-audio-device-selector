@@ -25,15 +25,21 @@ The project uses a dependency injection architecture with clean interfaces:
 ## Dependencies
 
 ```toml
+[features]
+default = []
+test-mocks = []              # Test-only mock implementations
+
 [dependencies]
-coreaudio-sys = "0.2"      # CoreAudio bindings
-core-foundation = "0.9"    # macOS system integration
-serde = "1.0"              # Configuration serialization
-toml = "0.8"               # Configuration format
-tracing = "0.1"            # Structured logging
-clap = "4.0"               # CLI interface
-anyhow = "1.0"             # Error handling
-libc = "0.2"               # System calls
+coreaudio-sys = "0.2"       # CoreAudio bindings
+core-foundation = "0.9"     # macOS system integration
+serde = "1.0"               # Configuration serialization
+toml = "0.8"                # Configuration format
+tracing = "0.1"             # Structured logging
+clap = "4.0"                # CLI interface
+anyhow = "1.0"              # Error handling
+libc = "0.2"                # System calls
+signal-hook = "0.3"         # Signal handling (SIGTERM, SIGINT, SIGHUP)
+tokio = "1.0"               # Async runtime
 ```
 
 ## Configuration
@@ -80,19 +86,29 @@ cargo test
 cargo run --example list_devices
 ```
 
-### Testing
+### CLI Commands
 ```bash
-# List all audio devices
-cargo run -- --list-devices
+# Core Operations
+cargo run -- daemon                              # Run daemon (background monitoring)
+cargo run -- list-devices --verbose             # List all audio devices with details
 
-# Test device monitoring
-cargo run -- --test-monitor
+# Device Management
+cargo run -- device-info --device "AirPods"     # Show detailed device information
+cargo run -- check-device --device "Mic"        # Check device availability
+cargo run -- switch --device "Speakers"         # Switch to specific device
+cargo run -- show-current                       # Show currently active devices
+cargo run -- show-default                       # Show default devices
 
-# Run in daemon mode
-cargo run -- --daemon
+# Service Management
+cargo run -- status                             # Show service status and configuration
+cargo run -- install-service                    # Install system service
+cargo run -- uninstall-service                  # Uninstall system service
 
-# Validate configuration
-cargo run -- --check-config
+# Testing and Diagnostics
+cargo run -- test-monitor                       # Test device monitoring
+cargo run -- check-config                       # Validate configuration
+cargo run -- test-notification                  # Test notification system
+cargo run -- cleanup-logs --keep-days 7         # Clean up old log files
 ```
 
 ### Linting and Formatting
@@ -177,9 +193,14 @@ tests/
 - **Real-time device monitoring**: Immediate response to audio device changes
 - **Priority-based switching**: Configurable weighted device preferences
 - **Background service**: Runs as daemon for continuous monitoring
+- **Comprehensive CLI**: Device management, diagnostics, and service control commands
+- **Enhanced signal handling**: SIGTERM, SIGINT, SIGHUP support with graceful shutdown
+- **Configuration hot-reload**: SIGHUP triggers immediate config reload
 - **Configuration-driven**: User-friendly TOML configuration
 - **Dependency injection**: Clean architecture with testable interfaces
+- **Feature-gated testing**: Mock implementations available via test-mocks feature
 - **Comprehensive testing**: Unit, integration, and mock-based tests
+- **Library API**: Public interface for external Rust applications
 - **Safe memory management**: Uses Core Foundation safe wrappers
 - **Structured logging**: Comprehensive tracing support
 

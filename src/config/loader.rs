@@ -83,6 +83,8 @@ impl<F: FileSystemInterface> ConfigLoader<F> {
     }
 
     /// Reload configuration from file (useful for config hot reloading)
+    // Called at runtime by service_v2 when SIGHUP signal is received for configuration hot-reload
+    #[allow(dead_code)]
     pub fn reload_config(&self) -> Result<Config> {
         debug!("Reloading configuration");
         self.load_config()
@@ -106,6 +108,8 @@ impl<F: FileSystemInterface> ConfigLoader<F> {
     }
 
     /// Check if the configuration file exists
+    // Called at runtime by CLI commands and service initialization to validate config presence
+    #[allow(dead_code)]
     pub fn config_exists(&self) -> bool {
         self.file_system.config_file_exists(&self.config_path)
     }
@@ -146,11 +150,15 @@ impl<F: FileSystemInterface> ConfigLoader<F> {
 
 // Convenience constructor for production use with StandardFileSystem
 impl ConfigLoader<crate::system::StandardFileSystem> {
+    // Called at runtime by production code that needs to create config loader with real file system
+    #[allow(dead_code)]
     pub fn new_production(config_path: PathBuf) -> Self {
         Self::new(crate::system::StandardFileSystem, config_path)
     }
 
     /// Create a production config loader with the default path
+    // Called at runtime by service and CLI initialization when no custom config path is provided
+    #[allow(dead_code)]
     pub fn new_with_default_path() -> Result<Self> {
         let config_path = Self::default_config_path()?;
         Ok(Self::new_production(config_path))

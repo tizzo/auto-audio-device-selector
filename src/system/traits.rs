@@ -25,6 +25,8 @@ pub trait AudioSystemInterface {
     fn add_device_change_listener(&self, callback: Box<dyn Fn() + Send + Sync>) -> Result<()>;
 
     /// Check if a specific device is currently available
+    // Called by device controller and CLI commands to verify device availability
+    #[allow(dead_code)]
     fn is_device_available(&self, device_id: &str) -> Result<bool>;
 }
 
@@ -64,6 +66,8 @@ pub trait SystemServiceInterface {
     fn sleep_ms(&self, milliseconds: u64) -> Result<()>;
 
     /// Get the process ID of the current service
+    // Called by CLI status command and monitoring systems to show process information
+    #[allow(dead_code)]
     fn get_process_id(&self) -> u32;
 
     /// Check if configuration reload was requested (e.g., via SIGHUP)

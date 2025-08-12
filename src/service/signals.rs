@@ -10,7 +10,11 @@ use tracing::{info, warn};
 /// Signal types that can be received
 #[derive(Debug, Clone, Copy)]
 pub enum SignalType {
+    // Used by signal handlers for graceful service shutdown (SIGTERM/SIGINT)
+    #[allow(dead_code)]
     Shutdown,
+    // Used by signal handlers for configuration reload (SIGHUP)
+    #[allow(dead_code)]
     Reload,
 }
 
@@ -18,6 +22,8 @@ pub enum SignalType {
 #[derive(Clone)]
 pub struct SignalHandler {
     shutdown_flag: Arc<AtomicBool>,
+    // Used by tokio-based signal handling system for async signal communication
+    #[allow(dead_code)]
     signal_sender: Option<mpsc::UnboundedSender<SignalType>>,
 }
 
@@ -29,6 +35,8 @@ impl SignalHandler {
         }
     }
 
+    // Called by service managers that need async signal communication via channels
+    #[allow(dead_code)]
     pub fn with_sender(signal_sender: mpsc::UnboundedSender<SignalType>) -> Self {
         Self {
             shutdown_flag: Arc::new(AtomicBool::new(false)),
@@ -37,11 +45,15 @@ impl SignalHandler {
     }
 
     /// Get a reference to the shutdown flag
+    // Called by service main loops to check for shutdown requests via atomic flag
+    #[allow(dead_code)]
     pub fn shutdown_flag(&self) -> Arc<AtomicBool> {
         self.shutdown_flag.clone()
     }
 
     /// Start listening for shutdown signals
+    // Called by tokio-based service managers for async signal handling with SIGTERM/SIGINT/SIGHUP
+    #[allow(dead_code)]
     pub async fn listen_for_signals(&self) -> Result<()> {
         let mut signals = Signals::new([SIGTERM, SIGINT, SIGHUP])?;
 

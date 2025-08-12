@@ -7,7 +7,10 @@ pub mod system;
 
 pub use audio::{AudioDevice, AudioDeviceMonitor, DeviceControllerV2, DeviceType};
 pub use config::{Config, ConfigLoader};
-pub use notifications::{NotificationManager, SwitchReason, TestNotificationSender};
+pub use notifications::{NotificationManager, SwitchReason};
+
+#[cfg(any(test, feature = "test-mocks"))]
+pub use notifications::TestNotificationSender;
 pub use service::AudioDeviceService;
 
 // Re-export common functionality for library users

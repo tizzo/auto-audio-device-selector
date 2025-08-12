@@ -10,6 +10,7 @@ pub mod mocks;
 pub use adapters::*;
 pub use traits::*;
 
-// Re-export mocks for testing
+// Re-export mocks for testing - used by test code and integration tests with test-mocks feature
 #[cfg(any(test, feature = "test-mocks"))]
+#[allow(unused_imports)]
 pub use mocks::*;

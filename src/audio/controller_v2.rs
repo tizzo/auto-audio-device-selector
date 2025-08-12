@@ -166,31 +166,43 @@ impl<A: AudioSystemInterface> DeviceController<A> {
     }
 
     /// Get all available devices using the injected audio system
+    // Called at runtime by CLI commands (device_info, check_device, list_devices, show_current_devices)
+    #[allow(dead_code)]
     pub fn enumerate_devices(&self) -> Result<Vec<AudioDevice>> {
         self.audio_system.enumerate_devices()
     }
 
     /// Get the current default output device
+    // Called at runtime by CLI commands (show_default_devices, show_current_devices, status)
+    #[allow(dead_code)]
     pub fn get_default_output_device(&self) -> Result<Option<AudioDevice>> {
         self.audio_system.get_default_output_device()
     }
 
     /// Get the current default input device
+    // Called at runtime by CLI commands (show_default_devices, show_current_devices, status)
+    #[allow(dead_code)]
     pub fn get_default_input_device(&self) -> Result<Option<AudioDevice>> {
         self.audio_system.get_default_input_device()
     }
 
     /// Get the currently active output device (internal state)
+    // Called at runtime by the service layer and CLI commands for device state management
+    #[allow(dead_code)]
     pub fn get_current_output_device(&self) -> Option<&AudioDevice> {
         self.current_output.as_ref()
     }
 
     /// Get the currently active input device (internal state)
+    // Called at runtime by the service layer and CLI commands for device state management
+    #[allow(dead_code)]
     pub fn get_current_input_device(&self) -> Option<&AudioDevice> {
         self.current_input.as_ref()
     }
 
     /// Get device information (for backward compatibility)
+    // Called at runtime by CLI commands (device_info, list_devices with verbose flag)
+    #[allow(dead_code)]
     pub fn get_device_info(&self, device: &AudioDevice) -> Result<DeviceInfo> {
         Ok(DeviceInfo {
             name: device.name.clone(),
@@ -203,11 +215,15 @@ impl<A: AudioSystemInterface> DeviceController<A> {
     }
 
     /// Check if a device is currently available
+    // Called at runtime by service layer for device availability checks
+    #[allow(dead_code)]
     pub fn is_device_available(&self, device_id: &str) -> Result<bool> {
         self.audio_system.is_device_available(device_id)
     }
 
     /// Handle a device being connected (for external notification)
+    // Called at runtime by device monitoring system when new devices are detected
+    #[allow(dead_code)]
     pub fn handle_device_connected(&mut self, device: &AudioDevice) -> Result<()> {
         // Send notification first
         if let Err(e) = self.notification_manager.device_connected(device) {
@@ -263,6 +279,8 @@ impl<A: AudioSystemInterface> DeviceController<A> {
     }
 
     /// Handle a device being disconnected (for external notification)
+    // Called at runtime by device monitoring system when devices are unplugged
+    #[allow(dead_code)]
     pub fn handle_device_disconnected(&mut self, device: &AudioDevice) -> Result<()> {
         let mut cleared_current_device = false;
         
@@ -312,18 +330,24 @@ impl<A: AudioSystemInterface> DeviceController<A> {
     }
 
     /// Process device changes (to be called when device change callback is triggered)
+    // Called at runtime by CoreAudio property listeners when system audio state changes
+    #[allow(dead_code)]
     pub fn handle_device_change(&mut self) -> Result<()> {
         debug!("Processing device change event");
         self.update_current_devices()
     }
 
     /// Set the default output device by name (for backward compatibility)
+    // Called at runtime by CLI switch command and automatic switching logic
+    #[allow(dead_code)]
     pub fn set_default_output_device(&self, device_name: &str) -> Result<()> {
         info!("Setting default output device to: {}", device_name);
         self.audio_system.set_default_output_device(device_name)
     }
 
     /// Set the default input device by name (for backward compatibility)
+    // Called at runtime by CLI switch command and automatic switching logic
+    #[allow(dead_code)]
     pub fn set_default_input_device(&self, device_name: &str) -> Result<()> {
         info!("Setting default input device to: {}", device_name);
         self.audio_system.set_default_input_device(device_name)
@@ -332,6 +356,8 @@ impl<A: AudioSystemInterface> DeviceController<A> {
 
 // Convenience constructor for production use with CoreAudioSystem
 impl DeviceController<crate::system::CoreAudioSystem> {
+    // Called at runtime by production code for creating controller with real CoreAudio system
+    #[allow(dead_code)]
     pub fn new_production(config: &Config) -> Result<Self> {
         let audio_system = crate::system::CoreAudioSystem::new()?;
         Ok(Self::new(audio_system, config))

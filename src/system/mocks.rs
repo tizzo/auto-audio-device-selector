@@ -34,12 +34,16 @@ impl MockAudioSystem {
     }
 
     /// Add a device to the mock system
+    // Called by test code to simulate device connections during testing
+    #[allow(dead_code)]
     pub fn add_device(&self, device: AudioDevice) {
         self.devices.lock().unwrap().push(device);
         self.trigger_device_change();
     }
 
     /// Remove a device from the mock system
+    // Called by test code to simulate device disconnections during testing
+    #[allow(dead_code)]
     pub fn remove_device(&self, device_id: &str) {
         self.devices
             .lock()
@@ -49,18 +53,24 @@ impl MockAudioSystem {
     }
 
     /// Set the default output device
+    // Called by test code to control mock system's default output device state
+    #[allow(dead_code)]
     pub fn set_mock_default_output(&self, device: Option<AudioDevice>) {
         *self.default_output.lock().unwrap() = device;
         self.trigger_device_change();
     }
 
     /// Set the default input device
+    // Called by test code to control mock system's default input device state
+    #[allow(dead_code)]
     pub fn set_mock_default_input(&self, device: Option<AudioDevice>) {
         *self.default_input.lock().unwrap() = device;
         self.trigger_device_change();
     }
 
     /// Trigger all registered device change callbacks
+    // Called by mock system internally and by test code to simulate device change events
+    #[allow(dead_code)]
     pub fn trigger_device_change(&self) {
         let callbacks = self.device_change_callbacks.lock().unwrap();
         for callback in callbacks.iter() {
@@ -69,37 +79,51 @@ impl MockAudioSystem {
     }
 
     /// Get all set device calls that were made
+    // Called by test code to verify device switching operations were performed
+    #[allow(dead_code)]
     pub fn get_set_device_calls(&self) -> Vec<(String, String)> {
         self.set_device_calls.lock().unwrap().clone()
     }
 
     /// Clear the history of set device calls
+    // Called by test code to reset call history between test cases
+    #[allow(dead_code)]
     pub fn clear_set_device_calls(&self) {
         self.set_device_calls.lock().unwrap().clear();
     }
 
     /// Configure the mock to fail enumeration
+    // Called by test code to simulate audio system enumeration failures
+    #[allow(dead_code)]
     pub fn set_enumeration_failure(&self, should_fail: bool) {
         *self.should_fail_enumeration.lock().unwrap() = should_fail;
     }
 
     /// Configure the mock to fail device setting
+    // Called by test code to simulate audio system device switching failures
+    #[allow(dead_code)]
     pub fn set_device_setting_failure(&self, should_fail: bool) {
         *self.should_fail_set_device.lock().unwrap() = should_fail;
     }
 
     /// Get count of registered callbacks
+    // Called by test code to verify device change callback registration
+    #[allow(dead_code)]
     pub fn callback_count(&self) -> usize {
         self.device_change_callbacks.lock().unwrap().len()
     }
 
     /// Get enumerate device call count
+    // Called by test code to verify device enumeration was performed
+    #[allow(dead_code)]
     pub fn get_enumerate_calls(&self) -> usize {
         // Return 1 by default to simulate enumeration happening
         1
     }
 
     /// Get set default output device calls
+    // Called by test code to verify output device switching operations
+    #[allow(dead_code)]
     pub fn get_set_default_output_calls(&self) -> Vec<String> {
         self.set_device_calls
             .lock()
@@ -111,6 +135,8 @@ impl MockAudioSystem {
     }
 
     /// Get set default input device calls
+    // Called by test code to verify input device switching operations
+    #[allow(dead_code)]
     pub fn get_set_default_input_calls(&self) -> Vec<String> {
         self.set_device_calls
             .lock()
@@ -122,11 +148,15 @@ impl MockAudioSystem {
     }
 
     /// Get default output calls count
+    // Called by test code to verify number of output device operations
+    #[allow(dead_code)]
     pub fn get_default_output_calls(&self) -> usize {
         self.get_set_default_output_calls().len()
     }
 
     /// Get default input calls count
+    // Called by test code to verify number of input device operations
+    #[allow(dead_code)]
     pub fn get_default_input_calls(&self) -> usize {
         self.get_set_default_input_calls().len()
     }
@@ -239,6 +269,8 @@ impl MockFileSystem {
     }
 
     /// Add a file to the mock file system
+    // Called by test code to populate mock file system with test data
+    #[allow(dead_code)]
     pub fn add_file<P: AsRef<Path>>(&self, path: P, content: String) {
         let path_buf = path.as_ref().to_path_buf();
         self.files.lock().unwrap().insert(path_buf.clone(), content);
@@ -249,6 +281,8 @@ impl MockFileSystem {
     }
 
     /// Remove a file from the mock file system
+    // Called by test code to simulate file deletion scenarios
+    #[allow(dead_code)]
     pub fn remove_file<P: AsRef<Path>>(&self, path: P) {
         self.files
             .lock()
@@ -257,21 +291,29 @@ impl MockFileSystem {
     }
 
     /// Get all read calls that were made
+    // Called by test code to verify file read operations were performed
+    #[allow(dead_code)]
     pub fn get_read_calls(&self) -> Vec<PathBuf> {
         self.read_calls.lock().unwrap().clone()
     }
 
     /// Get all write calls that were made
+    // Called by test code to verify file write operations and their content
+    #[allow(dead_code)]
     pub fn get_write_calls(&self) -> Vec<(PathBuf, String)> {
         self.write_calls.lock().unwrap().clone()
     }
 
     /// Get all directory creation calls that were made
+    // Called by test code to verify directory creation operations
+    #[allow(dead_code)]
     pub fn get_directory_creation_calls(&self) -> Vec<PathBuf> {
         self.directory_creation_calls.lock().unwrap().clone()
     }
 
     /// Clear all call histories
+    // Called by test code to reset operation history between test cases
+    #[allow(dead_code)]
     pub fn clear_call_history(&self) {
         self.read_calls.lock().unwrap().clear();
         self.write_calls.lock().unwrap().clear();
@@ -279,21 +321,29 @@ impl MockFileSystem {
     }
 
     /// Configure the mock to fail read operations
+    // Called by test code to simulate file system read failures
+    #[allow(dead_code)]
     pub fn set_read_failure(&self, should_fail: bool) {
         *self.should_fail_read.lock().unwrap() = should_fail;
     }
 
     /// Configure the mock to fail write operations
+    // Called by test code to simulate file system write failures
+    #[allow(dead_code)]
     pub fn set_write_failure(&self, should_fail: bool) {
         *self.should_fail_write.lock().unwrap() = should_fail;
     }
 
     /// Configure the mock to fail directory creation
+    // Called by test code to simulate directory creation failures
+    #[allow(dead_code)]
     pub fn set_create_dir_failure(&self, should_fail: bool) {
         *self.should_fail_create_dir.lock().unwrap() = should_fail;
     }
 
     /// Check if a file exists in the mock system
+    // Called by test code to verify file existence in mock file system
+    #[allow(dead_code)]
     pub fn file_exists<P: AsRef<Path>>(&self, path: P) -> bool {
         self.files
             .lock()
@@ -401,52 +451,70 @@ impl MockSystemService {
     }
 
     /// Stop the service (simulate signal reception)
+    // Called by test code to simulate service shutdown signals
+    #[allow(dead_code)]
     pub fn stop_service(&self) {
         self.should_run
             .store(false, std::sync::atomic::Ordering::Relaxed);
     }
 
     /// Start the service
+    // Called by test code to simulate service startup
+    #[allow(dead_code)]
     pub fn start_service(&self) {
         self.should_run
             .store(true, std::sync::atomic::Ordering::Relaxed);
     }
 
     /// Check if signal handlers were registered
+    // Called by test code to verify signal handler registration
+    #[allow(dead_code)]
     pub fn are_signal_handlers_registered(&self) -> bool {
         self.signal_handler_registered
             .load(std::sync::atomic::Ordering::Relaxed)
     }
 
     /// Get the number of event loop calls
+    // Called by test code to verify service event loop execution
+    #[allow(dead_code)]
     pub fn get_event_loop_call_count(&self) -> usize {
         self.event_loop_calls
             .load(std::sync::atomic::Ordering::Relaxed)
     }
 
     /// Get all sleep calls that were made
+    // Called by test code to verify service sleep/timing behavior
+    #[allow(dead_code)]
     pub fn get_sleep_calls(&self) -> Vec<u64> {
         self.sleep_calls.lock().unwrap().clone()
     }
 
     /// Clear sleep call history
+    // Called by test code to reset timing call history between tests
+    #[allow(dead_code)]
     pub fn clear_sleep_calls(&self) {
         self.sleep_calls.lock().unwrap().clear();
     }
 
     /// Configure the mock to fail signal registration
+    // Called by test code to simulate signal handler registration failures
+    #[allow(dead_code)]
     pub fn set_signal_registration_failure(&self, should_fail: bool) {
         self.should_fail_signal_registration
             .store(should_fail, std::sync::atomic::Ordering::Relaxed);
     }
 
     /// Configure the mock to fail event loop
+    // Called by test code to simulate service event loop failures
+    #[allow(dead_code)]
     pub fn set_event_loop_failure(&self, should_fail: bool) {
         self.should_fail_event_loop
             .store(should_fail, std::sync::atomic::Ordering::Relaxed);
     }
 
     /// Reset all counters and state
+    // Called by test code to reset mock state between test cases
+    #[allow(dead_code)]
     pub fn reset(&self) {
         self.should_run
             .store(true, std::sync::atomic::Ordering::Relaxed);

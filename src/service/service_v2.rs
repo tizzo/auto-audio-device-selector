@@ -144,21 +144,29 @@ impl<A: AudioSystemInterface, F: FileSystemInterface, S: SystemServiceInterface>
     }
 
     /// Get the current configuration
+    // Called by CLI commands and monitoring systems that need access to current config
+    #[allow(dead_code)]
     pub fn get_config(&self) -> &Config {
         &self.config
     }
 
     /// Get the process ID of the service
+    // Called by CLI status command and monitoring systems to display service process info
+    #[allow(dead_code)]
     pub fn get_process_id(&self) -> u32 {
         self.system_service.get_process_id()
     }
 
     /// Check if the service should continue running
+    // Called by service main loop to check if shutdown signal has been received
+    #[allow(dead_code)]
     pub fn should_continue_running(&self) -> bool {
         self.system_service.should_continue_running()
     }
 
     /// Handle a device being connected manually
+    // Called by CLI commands and external systems that need to trigger device connection handling
+    #[allow(dead_code)]
     pub fn handle_device_connected(&mut self, device_name: &str) -> Result<()> {
         info!("Manually handling device connection: {}", device_name);
 
@@ -174,6 +182,8 @@ impl<A: AudioSystemInterface, F: FileSystemInterface, S: SystemServiceInterface>
     }
 
     /// Handle a device being disconnected manually
+    // Called by CLI commands and external systems that need to trigger device disconnection handling
+    #[allow(dead_code)]
     pub fn handle_device_disconnected(&mut self, device_name: &str) -> Result<()> {
         info!("Manually handling device disconnection: {}", device_name);
 
@@ -201,6 +211,8 @@ impl<A: AudioSystemInterface, F: FileSystemInterface, S: SystemServiceInterface>
     }
 
     /// Shutdown the service gracefully
+    // Called by CLI commands and signal handlers for graceful service shutdown
+    #[allow(dead_code)]
     pub fn shutdown(&mut self) -> Result<()> {
         info!("Shutting down audio device service");
 
@@ -212,21 +224,29 @@ impl<A: AudioSystemInterface, F: FileSystemInterface, S: SystemServiceInterface>
     }
 
     /// Get device enumeration for external inspection
+    // Called by CLI commands that need to list all available audio devices
+    #[allow(dead_code)]
     pub fn enumerate_devices(&self) -> Result<Vec<crate::audio::AudioDevice>> {
         self.device_controller.enumerate_devices()
     }
 
     /// Get current output device
+    // Called by CLI status and monitoring commands to show current device state
+    #[allow(dead_code)]
     pub fn get_current_output_device(&self) -> Option<&crate::audio::AudioDevice> {
         self.device_controller.get_current_output_device()
     }
 
     /// Get current input device
+    // Called by CLI status and monitoring commands to show current device state
+    #[allow(dead_code)]
     pub fn get_current_input_device(&self) -> Option<&crate::audio::AudioDevice> {
         self.device_controller.get_current_input_device()
     }
 
     /// Manually set output device (for testing or manual control)
+    // Called by CLI switch commands and external control systems for manual device switching
+    #[allow(dead_code)]
     pub fn set_output_device(&mut self, device_name: &str) -> Result<()> {
         info!("Manually setting output device: {}", device_name);
 
@@ -243,6 +263,8 @@ impl<A: AudioSystemInterface, F: FileSystemInterface, S: SystemServiceInterface>
     }
 
     /// Manually set input device (for testing or manual control)
+    // Called by CLI switch commands and external control systems for manual device switching
+    #[allow(dead_code)]
     pub fn set_input_device(&mut self, device_name: &str) -> Result<()> {
         info!("Manually setting input device: {}", device_name);
 
@@ -283,7 +305,7 @@ impl
 }
 
 // Convenience constructor for testing
-#[cfg(test)]
+#[cfg(any(test, feature = "test-mocks"))]
 impl
     AudioDeviceService<
         crate::system::MockAudioSystem,
@@ -291,6 +313,7 @@ impl
         crate::system::MockSystemService,
     >
 {
+    #[allow(dead_code)]  // Used by integration tests which run in different compilation context
     pub fn new_for_testing(config_path: PathBuf) -> Self {
         let audio_system = crate::system::MockAudioSystem::new();
         let file_system = crate::system::MockFileSystem::new();
@@ -301,11 +324,13 @@ impl
     }
 
     /// Access the mock system service for test control
+    #[allow(dead_code)]  // Used by integration tests which run in different compilation context
     pub fn mock_system_service(&self) -> &crate::system::MockSystemService {
         &self.system_service
     }
 
     /// For testing: Get the configuration loader
+    #[allow(dead_code)]  // Used by integration tests which run in different compilation context
     pub fn config_loader(&self) -> &ConfigLoader<crate::system::MockFileSystem> {
         &self.config_loader
     }
