@@ -501,6 +501,11 @@ impl SystemServiceInterface for MockSystemService {
         // Return a fixed process ID for testing
         12345
     }
+
+    fn is_config_reload_requested(&self) -> bool {
+        // For testing, just return false unless we need specific behavior
+        false
+    }
 }
 
 impl Default for MockSystemService {

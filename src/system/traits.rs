@@ -65,4 +65,8 @@ pub trait SystemServiceInterface {
 
     /// Get the process ID of the current service
     fn get_process_id(&self) -> u32;
+
+    /// Check if configuration reload was requested (e.g., via SIGHUP)
+    /// Returns true once when reload is requested, false otherwise
+    fn is_config_reload_requested(&self) -> bool;
 }

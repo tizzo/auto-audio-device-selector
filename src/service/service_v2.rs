@@ -80,7 +80,17 @@ impl<A: AudioSystemInterface, F: FileSystemInterface, S: SystemServiceInterface>
                 error!("Error updating current devices: {}", e);
             }
 
-            // Check for configuration changes (hot reload)
+            // Check for SIGHUP configuration reload request
+            if self.system_service.is_config_reload_requested() {
+                info!("Received SIGHUP signal, reloading configuration");
+                if let Err(e) = self.reload_config() {
+                    error!("Failed to reload configuration: {}", e);
+                } else {
+                    info!("Configuration reloaded successfully");
+                }
+            }
+
+            // Check for configuration changes (file-based hot reload)
             if let Err(e) = self.check_config_reload() {
                 error!("Error checking config reload: {}", e);
             }

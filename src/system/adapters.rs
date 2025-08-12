@@ -1,6 +1,10 @@
 use anyhow::Result;
 use std::path::Path;
 use std::sync::{Arc, Mutex};
+use std::sync::atomic::{AtomicBool, Ordering};
+use signal_hook::consts::{SIGTERM, SIGINT, SIGHUP};
+use signal_hook::flag;
+use tracing::info;
 
 use crate::audio::{AudioDevice, DeviceController};
 use crate::system::traits::{AudioSystemInterface, FileSystemInterface, SystemServiceInterface};
@@ -96,21 +100,35 @@ impl FileSystemInterface for StandardFileSystem {
 /// Production implementation of SystemServiceInterface for macOS
 pub struct MacOSSystemService {
     should_continue: Arc<std::sync::atomic::AtomicBool>,
+    config_reload_requested: Arc<std::sync::atomic::AtomicBool>,
 }
 
 impl MacOSSystemService {
     pub fn new() -> Self {
         Self {
-            should_continue: Arc::new(std::sync::atomic::AtomicBool::new(true)),
+            should_continue: Arc::new(AtomicBool::new(true)),
+            config_reload_requested: Arc::new(AtomicBool::new(false)),
         }
+    }
+
+    /// Check if configuration reload was requested via SIGHUP
+    pub fn is_config_reload_requested(&self) -> bool {
+        self.config_reload_requested.swap(false, Ordering::Relaxed)
     }
 }
 
 impl SystemServiceInterface for MacOSSystemService {
     fn register_signal_handlers(&self) -> Result<()> {
-        // TODO: Implement actual signal handling
-        // For now, just return success
-        tracing::info!("Signal handlers registered (placeholder implementation)");
+        info!("Registering signal handlers for SIGTERM, SIGINT, SIGHUP");
+
+        // Register SIGTERM and SIGINT to set shutdown flag
+        flag::register(SIGTERM, Arc::clone(&self.should_continue))?;
+        flag::register(SIGINT, Arc::clone(&self.should_continue))?;
+
+        // Register SIGHUP to set config reload flag
+        flag::register(SIGHUP, Arc::clone(&self.config_reload_requested))?;
+
+        info!("Signal handlers registered successfully");
         Ok(())
     }
 
@@ -122,8 +140,7 @@ impl SystemServiceInterface for MacOSSystemService {
     }
 
     fn should_continue_running(&self) -> bool {
-        self.should_continue
-            .load(std::sync::atomic::Ordering::Relaxed)
+        self.should_continue.load(Ordering::Relaxed)
     }
 
     fn sleep_ms(&self, milliseconds: u64) -> Result<()> {
@@ -133,6 +150,10 @@ impl SystemServiceInterface for MacOSSystemService {
 
     fn get_process_id(&self) -> u32 {
         std::process::id()
+    }
+
+    fn is_config_reload_requested(&self) -> bool {
+        self.is_config_reload_requested()
     }
 }
 

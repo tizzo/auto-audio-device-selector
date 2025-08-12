@@ -14,7 +14,7 @@ use audio::AudioDeviceMonitor;
 use config::{Config, ConfigLoader};
 use logging::{LoggingConfig, cleanup_old_logs, get_default_log_dir, initialize_logging};
 use notifications::NotificationManager;
-use service::{AudioDeviceService, ServiceManager, daemon::ServiceInstaller};
+use service::{AudioDeviceService, daemon::ServiceInstaller};
 
 #[derive(Parser)]
 #[command(name = "audio-device-monitor")]
@@ -74,10 +74,6 @@ enum Commands {
     InstallService,
     /// Uninstall system service
     UninstallService,
-    /// Run as a background service (enhanced daemon)
-    Service,
-    /// Run with dependency injection architecture (new service)
-    ServiceV2,
     /// Clean up old log files
     CleanupLogs {
         /// Number of days to keep (default: 30)
@@ -124,7 +120,7 @@ async fn main() -> Result<()> {
             test_monitor().await?;
         }
         Some(Commands::Daemon) => {
-            run_daemon(config).await?;
+            run_daemon(cli.config.as_deref()).await?;
         }
         Some(Commands::CheckConfig) => {
             check_config(&config)?;
@@ -141,12 +137,6 @@ async fn main() -> Result<()> {
         Some(Commands::UninstallService) => {
             uninstall_service()?;
         }
-        Some(Commands::Service) => {
-            run_service(config).await?;
-        }
-        Some(Commands::ServiceV2) => {
-            run_service_v2(cli.config.as_deref()).await?;
-        }
         Some(Commands::CleanupLogs { keep_days }) => {
             cleanup_logs(keep_days)?;
         }
@@ -159,7 +149,7 @@ async fn main() -> Result<()> {
         None => {
             // Default behavior - run daemon if no command specified
             info!("No command specified, running in daemon mode");
-            run_daemon(config).await?;
+            run_daemon(cli.config.as_deref()).await?;
         }
     }
 
@@ -228,24 +218,26 @@ async fn test_monitor() -> Result<()> {
     Ok(())
 }
 
-async fn run_daemon(config: Config) -> Result<()> {
+async fn run_daemon(config_path: Option<&str>) -> Result<()> {
     info!("Starting daemon mode");
 
-    let monitor = AudioDeviceMonitor::new(config)?;
+    // Create the service with either custom or default config path
+    let mut service = if let Some(path) = config_path {
+        let config_path = std::path::PathBuf::from(path);
+        AudioDeviceService::new_production(config_path)?
+    } else {
+        AudioDeviceService::new_with_default_config()?
+    };
 
     println!("Audio device monitor daemon started");
-    println!("  Real-time device monitoring active");
-    println!("  Press Ctrl+C to stop");
+    println!("  Enhanced signal handling enabled");
+    println!("  Send SIGTERM or SIGINT to stop gracefully");
+    println!("  Send SIGHUP to reload configuration");
 
-    // Start monitoring in async mode
-    monitor.start_monitoring_async().await?;
-
-    // Wait for Ctrl+C
-    tokio::signal::ctrl_c().await?;
+    // Start the service (this will block until shutdown)
+    service.start()?;
 
     println!("Daemon stopped");
-    monitor.stop()?;
-
     Ok(())
 }
 
@@ -374,45 +366,6 @@ fn uninstall_service() -> Result<()> {
     Ok(())
 }
 
-async fn run_service(config: Config) -> Result<()> {
-    info!("Starting background service mode");
-
-    let mut service_manager = ServiceManager::new(config);
-
-    println!("Audio device monitor service starting...");
-    println!("  Enhanced signal handling enabled");
-    println!("  Send SIGTERM or SIGINT to stop gracefully");
-    println!("  Send SIGHUP to reload configuration");
-
-    service_manager.start().await?;
-
-    println!("Service stopped");
-    Ok(())
-}
-
-async fn run_service_v2(config_path: Option<&str>) -> Result<()> {
-    info!("Starting dependency injection service mode");
-
-    // Create the service with either custom or default config path
-    let mut service = if let Some(path) = config_path {
-        let config_path = std::path::PathBuf::from(path);
-        AudioDeviceService::new_production(config_path)?
-    } else {
-        AudioDeviceService::new_with_default_config()?
-    };
-
-    println!("Audio device monitor service (v2) starting...");
-    println!("  Dependency injection architecture enabled");
-    println!("  Complete system abstraction for testing");
-    println!("  Send SIGTERM or SIGINT to stop gracefully");
-    println!("  Configuration hot reload supported");
-
-    // Start the service (this will block until shutdown)
-    service.start()?;
-
-    println!("Service v2 stopped");
-    Ok(())
-}
 
 fn cleanup_logs(keep_days: u64) -> Result<()> {
     info!("Cleaning up old log files (keeping {} days)", keep_days);
