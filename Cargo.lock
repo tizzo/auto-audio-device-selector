@@ -109,6 +109,7 @@ name = "audio-device-monitor"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "audio-device-monitor",
  "clap",
  "core-foundation",
  "core-foundation-sys 0.2.3",

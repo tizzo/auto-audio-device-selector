@@ -10,6 +10,9 @@ pub use config::{Config, ConfigLoader};
 pub use notifications::{NotificationManager, SwitchReason, TestNotificationSender};
 pub use service::AudioDeviceService;
 
+// Re-export common functionality for library users
+pub use audio::controller::DeviceController;
+
 // Export system traits and adapters
 pub use system::{
     AudioSystemInterface, CoreAudioSystem, FileSystemInterface, MacOSSystemService,
@@ -17,4 +20,5 @@ pub use system::{
 };
 
 // Export mock implementations for testing (available for both unit and integration tests)
+#[cfg(any(test, feature = "test-mocks"))]
 pub use system::{MockAudioSystem, MockFileSystem, MockSystemService};

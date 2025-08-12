@@ -9,6 +9,10 @@ repository = "https://github.com/yourusername/audio-device-monitor"
 keywords = ["audio", "macos", "coreaudio", "device", "monitor"]
 categories = ["multimedia::audio", "os::macos-apis"]
 
+[features]
+default = []
+test-mocks = []
+
 [dependencies]
 # Audio-specific functionality
 coreaudio-sys = "0.2.11"  # Using compatible version
@@ -40,6 +44,11 @@ tokio-stream = "0.1"
 [dev-dependencies]
 tokio-test = "0.4"
 tempfile = "3.0"
+
+# Enable test-mocks feature for all dev builds (tests)
+[dev-dependencies.audio-device-monitor]
+path = "."
+features = ["test-mocks"]
 
 [build-dependencies]
 # For linking with macOS frameworks

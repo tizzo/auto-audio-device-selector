@@ -11,7 +11,7 @@ mod service;
 mod system;
 
 use audio::AudioDeviceMonitor;
-use config::{Config, ConfigLoader};
+use config::Config;
 use logging::{LoggingConfig, cleanup_old_logs, get_default_log_dir, initialize_logging};
 use notifications::NotificationManager;
 use service::{AudioDeviceService, daemon::ServiceInstaller};
@@ -84,6 +84,22 @@ enum Commands {
     TestNotification,
     /// Force notification via osascript only
     ForceNotification,
+    /// Show detailed information about a specific device
+    DeviceInfo {
+        /// Device name to inspect
+        #[arg(short, long)]
+        device: String,
+    },
+    /// Check if a device is currently available
+    CheckDevice {
+        /// Device name to check
+        #[arg(short, long)]
+        device: String,
+    },
+    /// Show current service status and configuration
+    Status,
+    /// Show current active/selected devices
+    ShowCurrent,
 }
 
 #[tokio::main]
@@ -145,6 +161,18 @@ async fn main() -> Result<()> {
         }
         Some(Commands::ForceNotification) => {
             force_notification()?;
+        }
+        Some(Commands::DeviceInfo { device }) => {
+            device_info(&device).await?;
+        }
+        Some(Commands::CheckDevice { device }) => {
+            check_device(&device).await?;
+        }
+        Some(Commands::Status) => {
+            show_status().await?;
+        }
+        Some(Commands::ShowCurrent) => {
+            show_current_devices().await?;
         }
         None => {
             // Default behavior - run daemon if no command specified
@@ -435,6 +463,122 @@ fn force_notification() -> Result<()> {
         let error = String::from_utf8_lossy(&output.stderr);
         println!("❌ Failed to send notification: {}", error);
         println!("💡 This suggests a system-level notification issue");
+    }
+
+    Ok(())
+}
+
+async fn device_info(device_name: &str) -> Result<()> {
+    info!("Getting device information for: {}", device_name);
+
+    let controller = audio::controller::DeviceController::new()?;
+    let devices = controller.enumerate_devices()?;
+
+    // Find the device
+    let device = devices
+        .iter()
+        .find(|d| d.name.contains(device_name) || d.name == device_name)
+        .ok_or_else(|| anyhow::anyhow!("Device '{}' not found", device_name))?;
+
+    // Get detailed info
+    if let Ok(info) = controller.get_device_info(device) {
+        println!("Device Information:");
+        println!("  Name: {}", info.name);
+        println!("  UID: {}", info.uid);
+        println!("  Type: {}", info.device_type);
+        println!("  Default: {}", if info.is_default { "Yes" } else { "No" });
+        println!("  Available: {}", if device.is_available { "Yes" } else { "No" });
+    } else {
+        println!("Device '{}' found but detailed info unavailable", device.name);
+    }
+
+    Ok(())
+}
+
+async fn check_device(device_name: &str) -> Result<()> {
+    info!("Checking device availability: {}", device_name);
+
+    let controller = audio::controller::DeviceController::new()?;
+    
+    // Check if device is available using the controller method
+    match controller.enumerate_devices() {
+        Ok(devices) => {
+            let device = devices
+                .iter()
+                .find(|d| d.name.contains(device_name) || d.name == device_name);
+
+            match device {
+                Some(d) => {
+                    println!("Device '{}': {}", device_name, 
+                        if d.is_available { "✓ Available" } else { "✗ Unavailable" }
+                    );
+                }
+                None => {
+                    println!("Device '{}': ✗ Not Found", device_name);
+                }
+            }
+        }
+        Err(e) => {
+            println!("Failed to check device availability: {}", e);
+        }
+    }
+
+    Ok(())
+}
+
+async fn show_status() -> Result<()> {
+    info!("Showing service status");
+
+    println!("Audio Device Monitor Status:");
+    println!("============================");
+
+    // Load and show config
+    let config = Config::load(None)?;
+    println!("  Configuration:");
+    println!("    Check interval: {}ms", config.general.check_interval_ms);
+    println!("    Log level: {}", config.general.log_level);
+    println!("    Output device rules: {}", config.output_devices.len());
+    println!("    Input device rules: {}", config.input_devices.len());
+    
+    // Show current devices
+    let controller = audio::controller::DeviceController::new()?;
+    
+    if let Ok(Some(output)) = controller.get_default_output_device() {
+        println!("    Current output: {}", output.name);
+    }
+    
+    if let Ok(Some(input)) = controller.get_default_input_device() {
+        println!("    Current input: {}", input.name);
+    }
+
+    // Show process info
+    println!("    Process ID: {}", std::process::id());
+    
+    Ok(())
+}
+
+async fn show_current_devices() -> Result<()> {
+    info!("Showing current active devices");
+
+    let controller = audio::controller::DeviceController::new()?;
+
+    println!("Current Active Devices:");
+    println!("======================");
+
+    if let Ok(Some(output)) = controller.get_default_output_device() {
+        println!("  🔊 Output: {}", output.name);
+        println!("     UID: {}", output.id);
+        println!("     Type: {}", output.device_type);
+    } else {
+        println!("  🔊 Output: None available");
+    }
+
+    if let Ok(Some(input)) = controller.get_default_input_device() {
+        println!("  🎤 Input: {}", input.name);
+        println!("     UID: {}", input.id);
+        println!("     Type: {}", input.device_type);
+    } else {
+        println!("  🎤 Input: None available");
     }
 
     Ok(())
