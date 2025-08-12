@@ -113,6 +113,10 @@ cargo fmt && cargo clippy && cargo test
 2. **Development**: Use `RUST_LOG=debug cargo run` for detailed logging
 3. **Testing**: Use `cargo test` for comprehensive unit and integration tests
 4. **Linting**: Run `cargo fmt && cargo clippy` before commits
+5. **Documentation**: Update `README.md` and inline comments for clarity
+6. **Version Control**: Use Git for source control, with feature branches for new functionality
+7. **Regular Commits**: Commit frequently with clear messages, always say why we made the change and not just what the change is. Resolve all lints and tests before committing.
+8. **Pull Requests**: Submit PRs for review, ensuring all tests pass and code is formatted
 
 ## Project Structure
 
