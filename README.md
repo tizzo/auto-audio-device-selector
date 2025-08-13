@@ -14,7 +14,8 @@ A Rust-based macOS audio device monitor that automatically switches to preferred
 - **Flexible Configuration**: TOML-based configuration with hot-reload support via SIGHUP signal
 - **Notification System**: macOS Notification Center integration for device changes and switching events
 - **Graceful Shutdown**: Proper signal handling for clean service lifecycle management
-- **Cross-platform Architecture**: Built with cpal for future extensibility while leveraging macOS-specific CoreAudio APIs
+- **Dependency Injection Architecture**: Clean, testable architecture with comprehensive mock support
+- **Comprehensive Testing**: Unit, integration, and mock-based test suites with 100% test isolation
 
 ## Requirements
 
@@ -96,7 +97,7 @@ daemon_mode = false
 
 [notifications]
 # Show notifications when devices are added/removed
-show_device_changes = true
+show_device_availability = true
 
 # Show notifications when automatic switching occurs
 show_switching_actions = true
@@ -145,7 +146,6 @@ Each device rule supports the following fields:
   - `"contains"` - Device name contains this string
   - `"starts_with"` - Device name starts with this string
   - `"ends_with"` - Device name ends with this string
-  - `"regex"` - Regular expression match (planned)
 - **`enabled`** (required): Whether this rule is active
 
 ### Priority System
@@ -156,65 +156,6 @@ The priority system works as follows:
 2. **Separate Input/Output**: Input and output devices are managed independently
 3. **Availability Check**: Only available (connected) devices are considered
 4. **Fallback Chain**: If the highest priority device is unavailable, the system falls back to the next highest priority available device
-
-### Example Scenarios
-
-#### Scenario 1: Basic Setup
-```toml
-[[output_devices]]
-name = "AirPods Pro"
-weight = 100
-match_type = "exact"
-enabled = true
-
-[[output_devices]]
-name = "MacBook Pro Speakers"
-weight = 10
-match_type = "exact"
-enabled = true
-```
-
-**Behavior**: Always prefer "AirPods Pro" when available, fall back to "MacBook Pro Speakers"
-
-#### Scenario 2: Multiple Similar Devices
-```toml
-[[output_devices]]
-name = "AirPods"
-weight = 100
-match_type = "contains"
-enabled = true
-
-[[output_devices]]
-name = "Studio"
-weight = 80
-match_type = "contains"
-enabled = true
-```
-
-**Behavior**: Any device containing "AirPods" gets priority 100, any device containing "Studio" gets priority 80
-
-#### Scenario 3: Work vs Personal Setup
-```toml
-[[output_devices]]
-name = "Sony WH-1000XM4"  # Personal headphones
-weight = 100
-match_type = "exact"
-enabled = true
-
-[[output_devices]]
-name = "Dell Monitor"     # Work monitor
-weight = 90
-match_type = "contains"
-enabled = true
-
-[[output_devices]]
-name = "MacBook Pro Speakers"  # Fallback
-weight = 10
-match_type = "exact"
-enabled = true
-```
-
-**Behavior**: Personal headphones first, then work monitor, then laptop speakers
 
 ## Usage
 
@@ -262,11 +203,6 @@ audio-device-monitor [OPTIONS] [COMMAND]
   audio-device-monitor daemon
   ```
 
-- **`service`** - Run as background service with enhanced signal handling
-  ```bash
-  audio-device-monitor service
-  ```
-
 - **`install-service`** - Install as macOS LaunchAgent
   ```bash
   audio-device-monitor install-service
@@ -290,6 +226,26 @@ audio-device-monitor [OPTIONS] [COMMAND]
 - **`test-notification`** - Test notification system
   ```bash
   audio-device-monitor test-notification
+  ```
+
+- **`device-info`** - Show detailed information about a specific device
+  ```bash
+  audio-device-monitor device-info --device "AirPods Pro"
+  ```
+
+- **`check-device`** - Check if a device is currently available
+  ```bash
+  audio-device-monitor check-device --device "Blue Yeti"
+  ```
+
+- **`status`** - Show current service status and configuration
+  ```bash
+  audio-device-monitor status
+  ```
+
+- **`show-current`** - Show current active/selected devices
+  ```bash
+  audio-device-monitor show-current
   ```
 
 ## Service Management
@@ -328,31 +284,6 @@ tail -f ~/.local/share/audio-device-monitor/logs/audio-device-monitor.log.*
 audio-device-monitor uninstall-service
 ```
 
-### Service Configuration
-
-The installed service uses the following configuration:
-
-- **Executable**: Current binary location (copies path at install time)
-- **Run Mode**: Daemon mode with real-time monitoring
-- **Auto-restart**: Enabled (service restarts if it crashes)
-- **Log Output**: `/tmp/audio-device-monitor.log` and `/tmp/audio-device-monitor.err`
-- **Environment**: `RUST_LOG=info` for standard logging level
-
-### Enhanced Service Mode
-
-For advanced users who want more control over the service:
-
-```bash
-# Run with enhanced signal handling
-audio-device-monitor service
-
-# Features:
-# - Graceful shutdown on SIGTERM/SIGINT
-# - Configuration hot-reload on SIGHUP
-# - Better error handling and recovery
-# - Structured logging with metadata
-```
-
 ### Hot Configuration Reload
 
 The service supports hot reloading of configuration without restart:
@@ -374,13 +305,6 @@ launchctl kill -HUP system/com.audiodevicemonitor.daemon
 - General configuration settings
 - All matching patterns and device rules
 
-**The reload process:**
-1. Receives SIGHUP signal
-2. Stops current audio monitoring
-3. Reloads configuration from disk
-4. Restarts monitoring with new settings
-5. Logs the successful reload
-
 ## Notification System
 
 The application integrates with macOS Notification Center to provide real-time feedback about device changes and switching events.
@@ -388,20 +312,9 @@ The application integrates with macOS Notification Center to provide real-time f
 ### Notification Types
 
 1. **Device Connected** - Shows when audio devices come online
-   - Displays device name and type (🎤 Input, 🔊 Output, 🎧 Input/Output)
-   - Helps track device availability
-
 2. **Device Disconnected** - Shows when audio devices go offline
-   - Alerts when preferred devices become unavailable
-   - Useful for troubleshooting connectivity issues
-
 3. **Device Switched** - Shows when automatic switching occurs
-   - Indicates which device was selected and why
-   - Includes switching reason (higher priority, previous unavailable)
-
 4. **Switch Failed** - Shows when device switching fails
-   - Displays error information for troubleshooting
-   - Helps identify device conflicts or permission issues
 
 ### Notification Configuration
 
@@ -410,7 +323,7 @@ Configure notifications in your TOML configuration file:
 ```toml
 [notifications]
 # Show notifications when devices are added/removed
-show_device_changes = true
+show_device_availability = true
 
 # Show notifications when automatic switching occurs
 show_switching_actions = true
@@ -422,142 +335,10 @@ show_switching_actions = true
 # Test the notification system
 audio-device-monitor test-notification
 
-# Run with notifications enabled
-audio-device-monitor service
+# Run daemon with notifications enabled
+audio-device-monitor daemon
 # (Try plugging/unplugging devices to see notifications)
 ```
-
-### Notification Examples
-
-- **"🎤 AirPods Pro is now available"** - Device connected
-- **"🔊 USB Speakers is no longer available"** - Device disconnected  
-- **"🔊 Output switched to AirPods Pro (higher priority)"** - Automatic switching
-- **"Failed to switch to Blue Yeti: Device in use"** - Switch failure
-
-## Logging System
-
-The application features a comprehensive logging system with multiple output options and automatic management.
-
-### Log Locations
-
-- **Default Directory**: `~/.local/share/audio-device-monitor/logs/`
-- **File Format**: `audio-device-monitor.log.YYYY-MM-DD` (daily rotation)
-- **Service Logs**: `/tmp/audio-device-monitor.log` (when running as service)
-
-### Logging Options
-
-```bash
-# Enable debug logging
-audio-device-monitor --verbose list-devices
-
-# JSON format for log aggregation
-audio-device-monitor --json-logs daemon
-
-# Console-only logging (no files)
-audio-device-monitor --no-file-logs test-monitor
-
-# Custom log directory
-audio-device-monitor --log-dir /var/log/audio-monitor daemon
-
-# Combination of options
-audio-device-monitor --verbose --json-logs --log-dir ~/logs service
-```
-
-### Log Management
-
-```bash
-# Clean up old logs (keep last 30 days)
-audio-device-monitor cleanup-logs --keep-days 30
-
-# View recent logs
-tail -f ~/.local/share/audio-device-monitor/logs/audio-device-monitor.log.*
-
-# View logs in JSON format
-jq '.' ~/.local/share/audio-device-monitor/logs/audio-device-monitor.log.*
-```
-
-### Examples
-
-#### Complete Service Setup:
-```bash
-# 1. Test the configuration
-audio-device-monitor check-config
-
-# 2. Test device detection
-audio-device-monitor list-devices
-
-# 3. Test real-time monitoring
-audio-device-monitor test-monitor
-# (Try plugging/unplugging devices to see live updates)
-
-# 4. Install as service
-audio-device-monitor install-service
-
-# 5. Verify service is running
-launchctl list | grep audiodevicemonitor
-```
-
-#### Manual Operation with Enhanced Logging:
-```bash
-# Run with detailed JSON logs
-audio-device-monitor --verbose --json-logs service
-
-# Run with console-only debug output
-audio-device-monitor --verbose --no-file-logs daemon
-
-# Run with custom configuration and logs
-audio-device-monitor -c ~/my-config.toml --log-dir ~/audio-logs daemon
-```
-
-#### Device Testing and Control:
-```bash
-# See what devices are available
-audio-device-monitor list-devices --verbose
-
-# Test manual switching
-audio-device-monitor switch --device "AirPods Pro"
-audio-device-monitor switch --device "Blue Yeti" --input
-
-# Check current defaults
-audio-device-monitor show-default
-
-# Validate configuration changes
-audio-device-monitor check-config
-```
-
-#### Troubleshooting:
-```bash
-# Enable maximum logging
-RUST_LOG=trace audio-device-monitor --verbose --json-logs test-monitor
-
-# Check service logs
-tail -f ~/.local/share/audio-device-monitor/logs/audio-device-monitor.log.*
-
-# Test configuration
-audio-device-monitor -c ~/my-config.toml check-config
-
-# Clean up old logs
-audio-device-monitor cleanup-logs --keep-days 7
-```
-
-## Architecture
-
-The application uses a hybrid architecture combining:
-
-- **CoreAudio**: For audio-specific device monitoring and control
-- **Core Foundation**: For macOS system integration and event loops
-- **cpal**: For cross-platform device enumeration and compatibility
-
-### Key Components
-
-1. **Audio Device Monitor**: Main orchestrator that coordinates all components
-2. **CoreAudio Listener**: Handles real-time device change notifications with automatic switching
-3. **Device Controller**: Manages device enumeration, information, and switching operations
-4. **Priority Manager**: Implements the weighted priority system for intelligent device selection
-5. **Service Manager**: Handles background service lifecycle with graceful shutdown
-6. **Configuration System**: Manages TOML configuration loading, validation, and hot-reload
-7. **Logging System**: Enhanced logging with rotation, JSON output, and automated cleanup
-8. **Signal Handler**: Advanced signal processing for service management
 
 ## Development
 
@@ -572,14 +353,14 @@ cargo build
 ### Running Tests
 
 ```bash
-# Run unit tests
+# Run all tests
 cargo test
 
-# Test device enumeration
-cargo run --example list_devices
+# Run with output for debugging
+cargo test -- --nocapture
 
-# Test real-time monitoring
-cargo run --example test_notifications
+# Run tests with logging
+RUST_LOG=debug cargo test
 ```
 
 ### Development Commands
@@ -591,23 +372,52 @@ cargo fmt
 # Run clippy for linting
 cargo clippy
 
-# Run with debug logging
-RUST_LOG=debug cargo run -- daemon
+# Run all checks
+cargo fmt && cargo clippy && cargo test
 
 # Build optimized release
 cargo build --release
 ```
 
+## Architecture
+
+The application uses a modern dependency injection architecture with clean interfaces:
+
+- **CoreAudio**: For audio-specific device monitoring and control
+- **Core Foundation**: For macOS system integration and event loops  
+- **Dependency Injection**: Clean abstractions with trait-based interfaces
+- **Mocking Support**: Comprehensive test doubles for all system interactions
+
+### Key Components
+
+1. **DeviceControllerV2**: Handles device switching and enumeration with dependency injection
+2. **Device Priority Manager**: Manages weighted priority lists for input/output devices
+3. **Audio System Interface**: Abstracts CoreAudio operations for testability
+4. **Configuration Loader**: File system abstracted configuration management
+5. **Notification Manager**: System notifications for device events
+6. **Service Layer**: Background service orchestration with dependency injection
+7. **Mock System**: Comprehensive test doubles for all external dependencies
+
+### Testing Strategy
+
+- **Unit Tests**: Pure logic components tested in isolation
+- **Integration Tests**: Cross-component functionality with mocks
+- **Mock System**: Complete test doubles for audio system, file system, and system services
+- **Builder Pattern**: Fluent test data construction utilities
+
 ## Project Status
 
 ### ✅ Completed Features
 
-- **Phase 1**: Project foundation, CLI interface, device enumeration, configuration system
-- **Phase 2**: CoreAudio integration, real-time device monitoring, priority-based recommendations  
-- **Phase 3**: Priority management system with weighted device selection and intelligent fallbacks
-- **Phase 4**: Automatic device switching with CoreAudio APIs and real-time event handling
-- **Phase 5**: Background service infrastructure, enhanced logging, and service installation
-- **Phase 6**: macOS Notification Center integration and hot configuration reload
+- **Phase 1: Foundation** - Device enumeration, configuration, priority management
+- **Phase 2: Dependency Injection Architecture** - Clean interfaces, comprehensive testing
+- **CoreAudio Integration** - Device monitoring and control
+- **Configuration System** - File system abstracted TOML configuration
+- **Priority Management** - Weighted device selection with matching rules
+- **Device Control** - Automatic switching implementation
+- **Notification System** - User feedback for device events
+- **Service Layer** - Background service with dependency injection
+- **Comprehensive Testing** - Unit, integration, and mock-based test suites
 
 ### 🚧 Current Capabilities
 
@@ -616,17 +426,14 @@ cargo build --release
 - **Enhanced Logging**: ✅ Daily rotation, JSON output, file/console logging, automated cleanup
 - **Manual Device Control**: ✅ Command-line switching for testing and manual control
 - **Priority-based Selection**: ✅ Configurable weight system with multiple matching modes
-- **Signal Handling**: ✅ Graceful shutdown and service lifecycle management
 - **Configuration Hot-reload**: ✅ Dynamic config changes via SIGHUP signal without service restart
 - **Notification System**: ✅ macOS Notification Center integration for device events
+- **Library API**: ✅ Comprehensive CLI commands for device management and inspection
 
 ### 📋 Planned Features
 
-- **System Tray Integration**: macOS menu bar integration for easy access
-- **GUI Configuration Interface**: Visual configuration editor
-- **Advanced Device Matching**: Full regex support and complex matching rules
-- **Statistics and Usage Reporting**: Device usage analytics and switching history
-- **Integration APIs**: Hooks for other audio applications and automation tools
+- **Production Deployment** - LaunchAgent setup and production hardening
+- **GUI Configuration** - User-friendly configuration interface
 
 ## Technical Details
 
@@ -650,138 +457,70 @@ cargo build --release
 - Configuration files stored in user directory
 - Uses only public macOS APIs
 - No system-level privileges needed
+- Input validation for all configuration parsing
 
 ## Troubleshooting
 
 ### Common Issues
 
 1. **Device detection not working**
-   - Ensure you have permission to access audio devices in System Preferences
-   - Check that CoreAudio property listeners are properly registered
-   - Verify logs for any CoreAudio errors
-   - Test with: `audio-device-monitor test-monitor`
+   - Check that CoreAudio property listeners are registered
+   - Verify device permissions in System Preferences → Security & Privacy → Microphone
+   - Check logs: `RUST_LOG=debug cargo run`
 
-2. **Automatic switching not working**
-   - Verify device names match exactly (use `list-devices` to check)
-   - Ensure devices are available and not exclusively used by other applications
-   - Check device priorities are set correctly in configuration
-   - Test manual switching: `audio-device-monitor switch --device "Device Name"`
-   - Verify priority manager is finding matches with verbose logging
+2. **Device switching fails**
+   - Ensure device is available and not in use by another application
+   - Check for system audio restrictions
+   - Verify device names match configuration exactly (case-sensitive)
 
-3. **Service not starting**
-   - Check service status: `launchctl list | grep audiodevicemonitor`
-   - Verify service installation: `ls ~/Library/LaunchAgents/com.audiodevicemonitor.daemon.plist`
-   - Check service logs: `tail -f /tmp/audio-device-monitor.log`
-   - Reinstall service: `audio-device-monitor uninstall-service && audio-device-monitor install-service`
+3. **Configuration not loading**
+   - Check file exists at `~/.config/audio-device-monitor/config.toml`
+   - Validate TOML syntax: `cargo run -- --check-config`
+   - Check file permissions and directory creation
 
-4. **Configuration file errors**
-   - Run `audio-device-monitor check-config` to validate syntax
-   - Check file permissions on `~/.config/audio-device-monitor/`
-   - Ensure TOML format is correct
-   - Test with custom config: `audio-device-monitor -c /path/to/config.toml check-config`
+4. **Tests failing**
+   - Ensure no other audio applications are interfering
+   - Run tests individually to isolate issues: `cargo test test_name`
+   - Check for dependency version conflicts: `cargo update`
 
-5. **Logging issues**
-   - Check log directory permissions: `ls -la ~/.local/share/audio-device-monitor/logs/`
-   - Try console-only mode: `audio-device-monitor --no-file-logs daemon`
-   - Clean up old logs: `audio-device-monitor cleanup-logs --keep-days 7`
-   - Test different log formats: `audio-device-monitor --json-logs test-monitor`
-
-### Debug Mode
-
-Enable detailed logging to troubleshoot issues:
+### Debug Commands
 
 ```bash
-# Enable debug logging with file output
-audio-device-monitor --verbose daemon
+# Enable verbose logging
+RUST_LOG=trace cargo run
 
-# Enable trace logging (very verbose) with JSON format
-RUST_LOG=trace audio-device-monitor --verbose --json-logs test-monitor
+# List all devices with details
+cargo run -- list-devices --verbose
 
-# Debug service mode
-audio-device-monitor --verbose --json-logs service
+# Test configuration parsing
+cargo run -- check-config
 
-# Debug with console only (no files)
-audio-device-monitor --verbose --no-file-logs test-monitor
+# Check device availability
+cargo run -- check-device --device "Your Device Name"
+
+# Show service status
+cargo run -- status
+
+# Show current devices
+cargo run -- show-current
 ```
-
-### Log Analysis
-
-```bash
-# View real-time logs
-tail -f ~/.local/share/audio-device-monitor/logs/audio-device-monitor.log.*
-
-# View JSON logs with formatting
-jq '.' ~/.local/share/audio-device-monitor/logs/audio-device-monitor.log.* | less
-
-# Filter logs by level
-grep "ERROR\|WARN" ~/.local/share/audio-device-monitor/logs/audio-device-monitor.log.*
-
-# Search for specific device events
-grep "device" ~/.local/share/audio-device-monitor/logs/audio-device-monitor.log.*
-```
-
-### Testing Workflow
-
-1. **Basic Functionality**:
-   ```bash
-   # Test device enumeration
-   audio-device-monitor list-devices --verbose
-   
-   # Verify configuration
-   audio-device-monitor check-config
-   
-   # Test manual switching
-   audio-device-monitor switch --device "Your Device Name"
-   ```
-
-2. **Real-time Monitoring**:
-   ```bash
-   # Test live monitoring
-   audio-device-monitor --verbose test-monitor
-   # (Try plugging/unplugging devices)
-   ```
-
-3. **Service Testing**:
-   ```bash
-   # Test service mode
-   audio-device-monitor --verbose service
-   # (Send SIGTERM with Ctrl+C to test graceful shutdown)
-   ```
-
-4. **Full Integration**:
-   ```bash
-   # Install and test service
-   audio-device-monitor install-service
-   launchctl list | grep audiodevicemonitor
-   tail -f ~/.local/share/audio-device-monitor/logs/audio-device-monitor.log.*
-   ```
-
-### Getting Help
-
-1. Check the logs for error messages (both console and file logs)
-2. Verify your configuration with `check-config`
-3. Test with `list-devices` to see available devices
-4. Use `test-monitor` to verify real-time detection
-5. Test manual switching to isolate automatic switching issues
-6. Try different logging modes to capture detailed information
-7. Clean up logs if disk space is an issue: `cleanup-logs --keep-days 7`
 
 ## Contributing
 
-1. Fork the repository
-2. Create a feature branch
-3. Follow Rust formatting conventions (`cargo fmt`)
-4. Ensure all tests pass (`cargo test`)
-5. Run clippy for linting (`cargo clippy`)
-6. Submit a pull request
+1. Follow Rust formatting conventions (`cargo fmt`)
+2. Ensure all tests pass (`cargo test`)
+3. Run clippy for linting (`cargo clippy`)
+4. Add tests for new functionality (unit + integration)
+5. Update documentation as needed
+6. Maintain dependency injection patterns for testability
 
 ## License
 
-This project is open source and available under the MIT License.
+This project is open source. Please respect macOS system APIs and user privacy when using or extending this code.
 
 ## Acknowledgments
 
-- Built with the excellent [cpal](https://github.com/RustAudio/cpal) cross-platform audio library
-- Uses [coreaudio-sys](https://github.com/RustAudio/coreaudio-sys) for CoreAudio bindings
-- Leverages [core-foundation](https://github.com/servo/core-foundation-rs) for macOS system integration
-- Inspired by macOS audio management tools like SwitchAudioSource and Recadio
+- Built with [coreaudio-sys](https://github.com/RustAudio/coreaudio-sys) for CoreAudio bindings
+- Uses [core-foundation](https://github.com/servo/core-foundation-rs) for macOS system integration
+- Configuration management with [serde](https://serde.rs/) and [toml](https://github.com/toml-rs/toml)
+- Structured logging with [tracing](https://tracing.rs/)
