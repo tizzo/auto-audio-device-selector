@@ -82,8 +82,6 @@ enum Commands {
     },
     /// Test notification system
     TestNotification,
-    /// Force notification via osascript only
-    ForceNotification,
     /// Show detailed information about a specific device
     DeviceInfo {
         /// Device name to inspect
@@ -158,9 +156,6 @@ async fn main() -> Result<()> {
         }
         Some(Commands::TestNotification) => {
             test_notification()?;
-        }
-        Some(Commands::ForceNotification) => {
-            force_notification()?;
         }
         Some(Commands::DeviceInfo { device }) => {
             device_info(&device).await?;
@@ -437,36 +432,6 @@ fn test_notification() -> Result<()> {
     Ok(())
 }
 
-fn force_notification() -> Result<()> {
-    use std::process::Command;
-
-    println!("🚀 Forcing notification via macOS osascript");
-    println!("==========================================");
-
-    let title = "Audio Device Monitor - Force Test";
-    let body = "This notification was sent directly via macOS osascript! 🎉";
-
-    let script = format!(
-        r#"display notification "{}" with title "{}" icon name "Sound""#,
-        body, title
-    );
-
-    println!("📱 Executing: osascript -e '{}'", script);
-
-    let output = Command::new("osascript").args(["-e", &script]).output()?;
-
-    if output.status.success() {
-        println!("✅ macOS notification sent successfully!");
-        println!("🔍 This should appear immediately in the top-right corner");
-        println!("   If you don't see it, notifications might be globally disabled");
-    } else {
-        let error = String::from_utf8_lossy(&output.stderr);
-        println!("❌ Failed to send notification: {}", error);
-        println!("💡 This suggests a system-level notification issue");
-    }
-
-    Ok(())
-}
 
 async fn device_info(device_name: &str) -> Result<()> {
     info!("Getting device information for: {}", device_name);
