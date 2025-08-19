@@ -233,46 +233,66 @@ impl<A: AudioSystemInterface> DeviceController<A> {
         // Check if this newly connected device should become the current device
         // based on priority rules
         let available_devices = self.audio_system.enumerate_devices()?;
-        
+
         match device.device_type {
             DeviceType::Output => {
-                let best_output = self.priority_manager.find_best_output_device(&available_devices);
+                let best_output = self
+                    .priority_manager
+                    .find_best_output_device(&available_devices);
                 if let Some(ref best_device) = best_output {
                     // If the best device is different from current, switch to it
                     if self.current_output.as_ref().map(|d| &d.id) != Some(&best_device.id) {
-                        info!("Switching to newly connected high-priority output device: {}", best_device.name);
+                        info!(
+                            "Switching to newly connected high-priority output device: {}",
+                            best_device.name
+                        );
                         self.switch_to_output_device(best_device)?;
                     }
                 }
-            },
+            }
             DeviceType::Input => {
-                let best_input = self.priority_manager.find_best_input_device(&available_devices);
+                let best_input = self
+                    .priority_manager
+                    .find_best_input_device(&available_devices);
                 if let Some(ref best_device) = best_input {
                     // If the best device is different from current, switch to it
                     if self.current_input.as_ref().map(|d| &d.id) != Some(&best_device.id) {
-                        info!("Switching to newly connected high-priority input device: {}", best_device.name);
+                        info!(
+                            "Switching to newly connected high-priority input device: {}",
+                            best_device.name
+                        );
                         self.switch_to_input_device(best_device)?;
                     }
                 }
-            },
+            }
             DeviceType::InputOutput => {
                 // Handle devices that support both input and output
-                let best_output = self.priority_manager.find_best_output_device(&available_devices);
+                let best_output = self
+                    .priority_manager
+                    .find_best_output_device(&available_devices);
                 if let Some(ref best_device) = best_output {
                     if self.current_output.as_ref().map(|d| &d.id) != Some(&best_device.id) {
-                        info!("Switching to newly connected high-priority output device: {}", best_device.name);
+                        info!(
+                            "Switching to newly connected high-priority output device: {}",
+                            best_device.name
+                        );
                         self.switch_to_output_device(best_device)?;
                     }
                 }
-                
-                let best_input = self.priority_manager.find_best_input_device(&available_devices);
+
+                let best_input = self
+                    .priority_manager
+                    .find_best_input_device(&available_devices);
                 if let Some(ref best_device) = best_input {
                     if self.current_input.as_ref().map(|d| &d.id) != Some(&best_device.id) {
-                        info!("Switching to newly connected high-priority input device: {}", best_device.name);
+                        info!(
+                            "Switching to newly connected high-priority input device: {}",
+                            best_device.name
+                        );
                         self.switch_to_input_device(best_device)?;
                     }
                 }
-            },
+            }
         }
 
         Ok(())
@@ -283,7 +303,7 @@ impl<A: AudioSystemInterface> DeviceController<A> {
     #[allow(dead_code)]
     pub fn handle_device_disconnected(&mut self, device: &AudioDevice) -> Result<()> {
         let mut cleared_current_device = false;
-        
+
         // Clear internal state if this was the current device
         if self.current_output.as_ref().map(|d| &d.id) == Some(&device.id) {
             info!("Clearing current output device: {}", device.name);
@@ -306,20 +326,31 @@ impl<A: AudioSystemInterface> DeviceController<A> {
         // be re-selected even if it appears available in enumerate_devices
         if cleared_current_device {
             // Find alternative devices from available ones, excluding the disconnected device
-            let available_devices = self.audio_system.enumerate_devices()?
+            let available_devices = self
+                .audio_system
+                .enumerate_devices()?
                 .into_iter()
                 .filter(|d| d.id != device.id && d.name != device.name)
                 .collect::<Vec<_>>();
-            
+
             if self.current_output.is_none() && device.device_type == DeviceType::Output {
-                if let Some(best_output) = self.priority_manager.find_best_output_device(&available_devices) {
-                    info!("Switching to alternative output device: {}", best_output.name);
+                if let Some(best_output) = self
+                    .priority_manager
+                    .find_best_output_device(&available_devices)
+                {
+                    info!(
+                        "Switching to alternative output device: {}",
+                        best_output.name
+                    );
                     self.switch_to_output_device(&best_output)?;
                 }
             }
-            
+
             if self.current_input.is_none() && device.device_type == DeviceType::Input {
-                if let Some(best_input) = self.priority_manager.find_best_input_device(&available_devices) {
+                if let Some(best_input) = self
+                    .priority_manager
+                    .find_best_input_device(&available_devices)
+                {
                     info!("Switching to alternative input device: {}", best_input.name);
                     self.switch_to_input_device(&best_input)?;
                 }

@@ -389,7 +389,6 @@ fn uninstall_service() -> Result<()> {
     Ok(())
 }
 
-
 fn cleanup_logs(keep_days: u64) -> Result<()> {
     info!("Cleaning up old log files (keeping {} days)", keep_days);
 
@@ -411,27 +410,26 @@ fn test_notification() -> Result<()> {
 
     println!("🔔 Testing macOS Notification System");
     println!("=====================================");
-    println!("");
+    println!();
 
     println!("📱 Sending test notification...");
     notification_manager.test_notification()?;
 
-    println!("");
+    println!();
     println!("✅ Notification sent successfully!");
-    println!("");
+    println!();
     println!("🔍 If you don't see the notification, try:");
     println!("   1. Click the 🕐 clock icon in top-right corner");
     println!("   2. Check if 'Do Not Disturb' is disabled");
     println!("   3. Open System Preferences > Notifications & Focus");
     println!("   4. Look for 'Audio Device Monitor' in the app list");
     println!("   5. Enable 'Allow Notifications' and 'Show in Notification Center'");
-    println!("");
+    println!();
     println!("💡 On first run, macOS may ask for notification permission");
     println!("   Grant permission when prompted, then run this test again");
 
     Ok(())
 }
-
 
 async fn device_info(device_name: &str) -> Result<()> {
     info!("Getting device information for: {}", device_name);
@@ -452,9 +450,15 @@ async fn device_info(device_name: &str) -> Result<()> {
         println!("  UID: {}", info.uid);
         println!("  Type: {}", info.device_type);
         println!("  Default: {}", if info.is_default { "Yes" } else { "No" });
-        println!("  Available: {}", if device.is_available { "Yes" } else { "No" });
+        println!(
+            "  Available: {}",
+            if device.is_available { "Yes" } else { "No" }
+        );
     } else {
-        println!("Device '{}' found but detailed info unavailable", device.name);
+        println!(
+            "Device '{}' found but detailed info unavailable",
+            device.name
+        );
     }
 
     Ok(())
@@ -464,7 +468,7 @@ async fn check_device(device_name: &str) -> Result<()> {
     info!("Checking device availability: {}", device_name);
 
     let controller = audio::controller::DeviceController::new()?;
-    
+
     // Check if device is available using the controller method
     match controller.enumerate_devices() {
         Ok(devices) => {
@@ -474,17 +478,23 @@ async fn check_device(device_name: &str) -> Result<()> {
 
             match device {
                 Some(d) => {
-                    println!("Device '{}': {}", device_name, 
-                        if d.is_available { "✓ Available" } else { "✗ Unavailable" }
+                    println!(
+                        "Device '{}': {}",
+                        device_name,
+                        if d.is_available {
+                            "✓ Available"
+                        } else {
+                            "✗ Unavailable"
+                        }
                     );
                 }
                 None => {
-                    println!("Device '{}': ✗ Not Found", device_name);
+                    println!("Device '{device_name}': ✗ Not Found");
                 }
             }
         }
         Err(e) => {
-            println!("Failed to check device availability: {}", e);
+            println!("Failed to check device availability: {e}");
         }
     }
 
@@ -504,21 +514,21 @@ async fn show_status() -> Result<()> {
     println!("    Log level: {}", config.general.log_level);
     println!("    Output device rules: {}", config.output_devices.len());
     println!("    Input device rules: {}", config.input_devices.len());
-    
+
     // Show current devices
     let controller = audio::controller::DeviceController::new()?;
-    
+
     if let Ok(Some(output)) = controller.get_default_output_device() {
         println!("    Current output: {}", output.name);
     }
-    
+
     if let Ok(Some(input)) = controller.get_default_input_device() {
         println!("    Current input: {}", input.name);
     }
 
     // Show process info
     println!("    Process ID: {}", std::process::id());
-    
+
     Ok(())
 }
 

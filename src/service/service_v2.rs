@@ -290,7 +290,12 @@ impl
     >
 {
     pub fn new_production(config_path: PathBuf) -> Result<Self> {
-        let audio_system = crate::system::CoreAudioSystem::new()?;
+        // Load config first to pass to CoreAudioSystem
+        let temp_file_system = crate::system::StandardFileSystem;
+        let config_loader = ConfigLoader::new(temp_file_system, config_path.clone());
+        let config = config_loader.load_config()?;
+
+        let audio_system = crate::system::CoreAudioSystem::new_with_config(&config)?;
         let file_system = crate::system::StandardFileSystem;
         let system_service = crate::system::MacOSSystemService::new();
 
@@ -313,7 +318,7 @@ impl
         crate::system::MockSystemService,
     >
 {
-    #[allow(dead_code)]  // Used by integration tests which run in different compilation context
+    #[allow(dead_code)] // Used by integration tests which run in different compilation context
     pub fn new_for_testing(config_path: PathBuf) -> Self {
         let audio_system = crate::system::MockAudioSystem::new();
         let file_system = crate::system::MockFileSystem::new();
@@ -324,13 +329,13 @@ impl
     }
 
     /// Access the mock system service for test control
-    #[allow(dead_code)]  // Used by integration tests which run in different compilation context
+    #[allow(dead_code)] // Used by integration tests which run in different compilation context
     pub fn mock_system_service(&self) -> &crate::system::MockSystemService {
         &self.system_service
     }
 
     /// For testing: Get the configuration loader
-    #[allow(dead_code)]  // Used by integration tests which run in different compilation context
+    #[allow(dead_code)] // Used by integration tests which run in different compilation context
     pub fn config_loader(&self) -> &ConfigLoader<crate::system::MockFileSystem> {
         &self.config_loader
     }

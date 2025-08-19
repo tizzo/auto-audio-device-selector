@@ -1,5 +1,5 @@
 //! Test utility builders for creating test instances of audio devices and rules
-//! 
+//!
 //! This module provides builder patterns for easily creating test data.
 //! Individual methods may not be used by all tests, so dead code warnings are suppressed.
 

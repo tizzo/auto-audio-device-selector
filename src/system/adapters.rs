@@ -1,24 +1,38 @@
 use anyhow::Result;
-use std::path::Path;
-use std::sync::{Arc, Mutex};
-use std::sync::atomic::{AtomicBool, Ordering};
-use signal_hook::consts::{SIGTERM, SIGINT, SIGHUP};
+use signal_hook::consts::{SIGHUP, SIGINT, SIGTERM};
 use signal_hook::flag;
+use std::path::Path;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex};
 use tracing::info;
 
+use crate::audio::listener::CoreAudioListener;
 use crate::audio::{AudioDevice, DeviceController};
 use crate::system::traits::{AudioSystemInterface, FileSystemInterface, SystemServiceInterface};
+
+type CallbackFn = Box<dyn Fn() + Send + Sync>;
 
 /// Production implementation of AudioSystemInterface using CoreAudio
 pub struct CoreAudioSystem {
     controller: DeviceController,
-    callbacks: Arc<Mutex<Vec<Box<dyn Fn() + Send + Sync>>>>,
+    listener: Option<CoreAudioListener>,
+    callbacks: Arc<Mutex<Vec<CallbackFn>>>,
 }
 
 impl CoreAudioSystem {
     pub fn new() -> Result<Self> {
         Ok(Self {
             controller: DeviceController::new()?,
+            listener: None,
+            callbacks: Arc::new(Mutex::new(Vec::new())),
+        })
+    }
+
+    pub fn new_with_config(config: &crate::config::Config) -> Result<Self> {
+        let listener = CoreAudioListener::new(config)?;
+        Ok(Self {
+            controller: DeviceController::new()?,
+            listener: Some(listener),
             callbacks: Arc::new(Mutex::new(Vec::new())),
         })
     }
@@ -50,9 +64,13 @@ impl AudioSystemInterface for CoreAudioSystem {
     }
 
     fn add_device_change_listener(&self, callback: Box<dyn Fn() + Send + Sync>) -> Result<()> {
-        // Store the callback for now
-        // TODO: Implement actual CoreAudio property listeners
+        // Store the callback
         self.callbacks.lock().unwrap().push(callback);
+
+        // Register CoreAudio property listeners if we have a listener instance
+        if let Some(ref listener) = self.listener {
+            listener.register_listeners()?;
+        }
         Ok(())
     }
 

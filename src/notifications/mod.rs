@@ -33,19 +33,19 @@ pub struct TestNotificationSender {
 
 #[cfg(any(test, feature = "test-mocks"))]
 impl TestNotificationSender {
-    #[allow(dead_code)]  // Used by integration tests which run in different compilation context
+    #[allow(dead_code)] // Used by integration tests which run in different compilation context
     pub fn new() -> Self {
         Self {
             sent_notifications: std::sync::Mutex::new(Vec::new()),
         }
     }
 
-    #[allow(dead_code)]  // Used by integration tests which run in different compilation context
+    #[allow(dead_code)] // Used by integration tests which run in different compilation context
     pub fn get_sent_notifications(&self) -> Vec<(String, String)> {
         self.sent_notifications.lock().unwrap().clone()
     }
 
-    #[allow(dead_code)]  // Used by integration tests which run in different compilation context
+    #[allow(dead_code)] // Used by integration tests which run in different compilation context
     pub fn clear(&self) {
         self.sent_notifications.lock().unwrap().clear();
     }
@@ -99,7 +99,7 @@ impl DefaultNotificationManager {
 
 impl<T: NotificationSender> NotificationManager<T> {
     #[cfg(any(test, feature = "test-mocks"))]
-    #[allow(dead_code)]  // Used by integration tests which run in different compilation context
+    #[allow(dead_code)] // Used by integration tests which run in different compilation context
     pub fn with_sender(config: &Config, sender: T) -> Self {
         Self {
             enabled: true,
@@ -278,11 +278,11 @@ enum NotificationType {
 /// Reasons for device switching (for notification context)
 #[derive(Debug, Clone)]
 pub enum SwitchReason {
-    HigherPriority,      // A higher priority device became available
+    HigherPriority, // A higher priority device became available
     // Used by device_switched notification system when previous device becomes unavailable
     #[allow(dead_code)]
     PreviousUnavailable, // Previous device became unavailable
-    Manual,              // User manually switched
+    Manual, // User manually switched
 }
 
 /// Send notification using native macOS osascript (more reliable for unsigned apps)
