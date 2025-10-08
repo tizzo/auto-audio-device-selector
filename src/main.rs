@@ -99,6 +99,10 @@ enum Commands {
     Status,
     /// Show current active/selected devices
     ShowCurrent,
+    /// Check if current devices match configured preferences
+    CheckPreferences,
+    /// Apply configured preferences by switching to preferred devices
+    ApplyPreferences,
 }
 
 #[tokio::main]
@@ -169,6 +173,12 @@ async fn main() -> Result<()> {
         }
         Some(Commands::ShowCurrent) => {
             show_current_devices().await?;
+        }
+        Some(Commands::CheckPreferences) => {
+            check_preferences().await?;
+        }
+        Some(Commands::ApplyPreferences) => {
+            apply_preferences().await?;
         }
         None => {
             // Default behavior - run daemon if no command specified
@@ -556,6 +566,117 @@ async fn show_current_devices() -> Result<()> {
     } else {
         println!("  🎤 Input: None available");
     }
+
+    Ok(())
+}
+
+async fn check_preferences() -> Result<()> {
+    info!("Checking if current devices match configured preferences");
+
+    let _config = Config::load(None)?;
+
+    // Use the default config path for the service
+    let service = service::AudioDeviceService::new_with_default_config()?;
+    let status = service.check_preferences()?;
+
+    println!("Preference Status:");
+    println!("==================");
+
+    println!("🔊 Output Device:");
+    if status.output_matches {
+        println!(
+            "  ✓ Matches preference: {}",
+            status.current_output.unwrap_or_else(|| "None".to_string())
+        );
+    } else {
+        println!("  ✗ Does not match preference");
+        println!(
+            "    Current: {}",
+            status.current_output.unwrap_or_else(|| "None".to_string())
+        );
+        println!(
+            "    Preferred: {}",
+            status
+                .preferred_output
+                .unwrap_or_else(|| "None available".to_string())
+        );
+    }
+
+    println!();
+    println!("🎤 Input Device:");
+    if status.input_matches {
+        println!(
+            "  ✓ Matches preference: {}",
+            status.current_input.unwrap_or_else(|| "None".to_string())
+        );
+    } else {
+        println!("  ✗ Does not match preference");
+        println!(
+            "    Current: {}",
+            status.current_input.unwrap_or_else(|| "None".to_string())
+        );
+        println!(
+            "    Preferred: {}",
+            status
+                .preferred_input
+                .unwrap_or_else(|| "None available".to_string())
+        );
+    }
+
+    if status.output_matches && status.input_matches {
+        println!();
+        println!("🎯 All devices match your configured preferences!");
+    } else {
+        println!();
+        println!("💡 Run 'apply-preferences' command to switch to preferred devices");
+    }
+
+    Ok(())
+}
+
+async fn apply_preferences() -> Result<()> {
+    info!("Applying configured device preferences");
+
+    let _config = Config::load(None)?;
+
+    // Use the default config path for the service
+    let service = service::AudioDeviceService::new_with_default_config()?;
+    let changes = service.apply_preferences()?;
+
+    if !changes.output_changed && !changes.input_changed {
+        println!("🎯 All devices already match your configured preferences!");
+        return Ok(());
+    }
+
+    println!("Applied Preference Changes:");
+    println!("===========================");
+
+    if changes.output_changed {
+        println!("🔊 Output Device:");
+        println!(
+            "  Switched to: {}",
+            changes
+                .new_output
+                .unwrap_or_else(|| "Failed to switch".to_string())
+        );
+    } else {
+        println!("🔊 Output Device: No change needed");
+    }
+
+    if changes.input_changed {
+        println!("🎤 Input Device:");
+        println!(
+            "  Switched to: {}",
+            changes
+                .new_input
+                .unwrap_or_else(|| "Failed to switch".to_string())
+        );
+    } else {
+        println!("🎤 Input Device: No change needed");
+    }
+
+    println!();
+    println!("✅ Preferences applied successfully!");
 
     Ok(())
 }
