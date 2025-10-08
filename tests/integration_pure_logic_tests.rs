@@ -4,7 +4,7 @@ use audio_device_monitor::notifications::{NotificationManager, SwitchReason};
 use audio_device_monitor::priority::DevicePriorityManager;
 
 mod test_utils;
-use test_utils::{AudioDeviceBuilder, DeviceRuleBuilder};
+use test_utils::builders::{AudioDeviceBuilder, DeviceRuleBuilder};
 
 /// Test complete device selection and notification flow
 #[cfg(test)]

@@ -1,7 +1,7 @@
 use audio_device_monitor::config::{DeviceRule, MatchType};
 
 mod test_utils;
-use test_utils::DeviceRuleBuilder;
+use test_utils::builders::DeviceRuleBuilder;
 
 /// Test exact matching behavior
 #[cfg(test)]

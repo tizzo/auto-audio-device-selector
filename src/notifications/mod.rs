@@ -32,6 +32,13 @@ pub struct TestNotificationSender {
 }
 
 #[cfg(any(test, feature = "test-mocks"))]
+impl Default for TestNotificationSender {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+#[cfg(any(test, feature = "test-mocks"))]
 impl TestNotificationSender {
     #[allow(dead_code)] // Used by integration tests which run in different compilation context
     pub fn new() -> Self {

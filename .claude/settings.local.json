@@ -14,7 +14,9 @@
       "Bash(time cargo test --test device_controller_integration_tests --quiet)",
       "Bash(git checkout:*)",
       "Bash(time cargo test --quiet)",
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "Bash(git stash:*)",
+      "Bash(git commit:*)"
     ],
     "deny": []
   }

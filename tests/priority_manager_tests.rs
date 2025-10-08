@@ -2,7 +2,7 @@ use audio_device_monitor::config::{Config, DeviceRule, GeneralConfig, Notificati
 use audio_device_monitor::priority::DevicePriorityManager;
 
 mod test_utils;
-use test_utils::{AudioDeviceBuilder, DeviceRuleBuilder};
+use test_utils::builders::{AudioDeviceBuilder, DeviceRuleBuilder};
 
 /// Helper function to create a test config with custom rules
 fn create_test_config(output_rules: Vec<DeviceRule>, input_rules: Vec<DeviceRule>) -> Config {

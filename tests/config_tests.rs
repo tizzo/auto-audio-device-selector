@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use tempfile::TempDir;
 
 mod test_utils;
-use test_utils::DeviceRuleBuilder;
+use test_utils::builders::DeviceRuleBuilder;
 
 /// Helper function to create a temporary config file with given content
 fn create_temp_config(content: &str) -> (TempDir, PathBuf) {

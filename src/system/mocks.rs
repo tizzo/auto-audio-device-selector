@@ -85,6 +85,14 @@ impl MockAudioSystem {
         self.set_device_calls.lock().unwrap().clone()
     }
 
+    /// Set all available devices at once
+    // Called by test code to set up device scenarios
+    #[allow(dead_code)]
+    pub fn set_available_devices(&self, devices: Vec<AudioDevice>) {
+        *self.devices.lock().unwrap() = devices;
+        self.trigger_device_change();
+    }
+
     /// Clear the history of set device calls
     // Called by test code to reset call history between test cases
     #[allow(dead_code)]
@@ -278,6 +286,13 @@ impl MockFileSystem {
             .lock()
             .unwrap()
             .insert(path_buf, std::time::SystemTime::now());
+    }
+
+    /// Set file content (alias for add_file for API consistency)
+    // Called by test code to set mock file content
+    #[allow(dead_code)]
+    pub fn set_file_content<P: AsRef<Path>>(&self, path: P, content: &str) {
+        self.add_file(path, content.to_string());
     }
 
     /// Remove a file from the mock file system

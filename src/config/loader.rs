@@ -146,6 +146,14 @@ impl<F: FileSystemInterface> ConfigLoader<F> {
         );
         Ok(config)
     }
+
+    /// Get reference to the file system (for testing)
+    // Called by test code to access mock file system for verification
+    #[cfg(any(test, feature = "test-mocks"))]
+    #[allow(dead_code)]
+    pub fn get_file_system(&self) -> &F {
+        &self.file_system
+    }
 }
 
 // Convenience constructor for production use with StandardFileSystem

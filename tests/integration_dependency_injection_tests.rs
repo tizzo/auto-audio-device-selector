@@ -182,10 +182,10 @@ enabled = true
 
         // Verify audio system received switching calls
         let switch_calls = fixture.audio_system.get_set_default_output_calls();
-        assert!(switch_calls.len() > 0);
+        assert!(!switch_calls.is_empty());
 
         let input_switch_calls = fixture.audio_system.get_set_default_input_calls();
-        assert!(input_switch_calls.len() > 0);
+        assert!(!input_switch_calls.is_empty());
     }
 
     #[test]
@@ -302,7 +302,7 @@ invalid_field = true
 
         // Verify mock systems tracked the calls
         assert!(fixture.audio_system.get_enumerate_calls() > 0);
-        assert!(fixture.file_system.get_read_calls().len() > 0);
+        assert!(!fixture.file_system.get_read_calls().is_empty());
         assert!(fixture.system_service.get_process_id() > 0);
 
         // Verify file system operations
@@ -377,7 +377,7 @@ enabled = true
 
         // Verify all mock systems were properly exercised
         assert!(fixture.audio_system.get_enumerate_calls() > 0);
-        assert!(fixture.file_system.get_read_calls().len() > 0);
+        assert!(!fixture.file_system.get_read_calls().is_empty());
         assert!(fixture.system_service.get_process_id() > 0);
     }
 }

@@ -3,7 +3,7 @@ use audio_device_monitor::config::{Config, GeneralConfig, NotificationConfig};
 use audio_device_monitor::notifications::{NotificationManager, SwitchReason};
 
 mod test_utils;
-use test_utils::AudioDeviceBuilder;
+use test_utils::builders::AudioDeviceBuilder;
 
 /// Helper function to create notification manager with test sender (no system notifications)
 fn create_test_notification_manager(
@@ -292,7 +292,7 @@ mod switch_reason_formatting {
 
         for (i, reason) in reasons.into_iter().enumerate() {
             let device = AudioDeviceBuilder::new()
-                .name(&format!("Device {}", i))
+                .name(&format!("Device {i}"))
                 .output()
                 .build();
 

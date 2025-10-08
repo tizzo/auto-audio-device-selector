@@ -339,6 +339,24 @@ impl
     pub fn config_loader(&self) -> &ConfigLoader<crate::system::MockFileSystem> {
         &self.config_loader
     }
+
+    /// Access the mock audio system for test control
+    #[allow(dead_code)] // Used by integration tests which run in different compilation context
+    pub fn mock_audio_system(&self) -> &crate::system::MockAudioSystem {
+        self.device_controller.get_audio_system()
+    }
+
+    /// Access the mock file system for test control
+    #[allow(dead_code)] // Used by integration tests which run in different compilation context
+    pub fn mock_file_system(&self) -> &crate::system::MockFileSystem {
+        self.config_loader.get_file_system()
+    }
+
+    /// Get the config path for testing
+    #[allow(dead_code)] // Used by integration tests which run in different compilation context
+    pub fn config_path(&self) -> &std::path::Path {
+        self.config_loader.get_config_path()
+    }
 }
 
 #[cfg(test)]

@@ -383,6 +383,14 @@ impl<A: AudioSystemInterface> DeviceController<A> {
         info!("Setting default input device to: {}", device_name);
         self.audio_system.set_default_input_device(device_name)
     }
+
+    /// Get reference to the audio system (for testing)
+    // Called by test code to access mock audio system for verification
+    #[cfg(any(test, feature = "test-mocks"))]
+    #[allow(dead_code)]
+    pub fn get_audio_system(&self) -> &A {
+        &self.audio_system
+    }
 }
 
 // Convenience constructor for production use with CoreAudioSystem

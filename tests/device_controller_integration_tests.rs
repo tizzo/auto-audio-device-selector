@@ -180,8 +180,8 @@ enabled = true
         assert!(result.is_ok());
 
         // Verify audio system received switching calls
-        assert!(audio_system.get_set_default_output_calls().len() > 0);
-        assert!(audio_system.get_set_default_input_calls().len() > 0);
+        assert!(!audio_system.get_set_default_output_calls().is_empty());
+        assert!(!audio_system.get_set_default_input_calls().is_empty());
 
         // Verify current devices are tracked
         let current_output = device_controller.get_current_output_device();
@@ -237,7 +237,7 @@ enabled = true
         assert!(result.is_ok());
 
         // The controller should have attempted to switch to the high-priority device
-        assert!(audio_system.get_set_default_output_calls().len() > 0);
+        assert!(!audio_system.get_set_default_output_calls().is_empty());
     }
 
     #[test]
@@ -399,7 +399,7 @@ enabled = true
             device_controller
                 .switch_to_output_device(output_device)
                 .unwrap();
-            assert!(audio_system.get_set_default_output_calls().len() > 0);
+            assert!(!audio_system.get_set_default_output_calls().is_empty());
         }
 
         if let Some(input_device) = devices
@@ -409,7 +409,7 @@ enabled = true
             device_controller
                 .switch_to_input_device(input_device)
                 .unwrap();
-            assert!(audio_system.get_set_default_input_calls().len() > 0);
+            assert!(!audio_system.get_set_default_input_calls().is_empty());
         }
     }
 }
