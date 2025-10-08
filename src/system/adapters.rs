@@ -117,15 +117,15 @@ impl FileSystemInterface for StandardFileSystem {
 
 /// Production implementation of SystemServiceInterface for macOS
 pub struct MacOSSystemService {
-    should_continue: Arc<std::sync::atomic::AtomicBool>,
     config_reload_requested: Arc<std::sync::atomic::AtomicBool>,
+    shutdown_requested: Arc<std::sync::atomic::AtomicBool>,
 }
 
 impl MacOSSystemService {
     pub fn new() -> Self {
         Self {
-            should_continue: Arc::new(AtomicBool::new(true)),
             config_reload_requested: Arc::new(AtomicBool::new(false)),
+            shutdown_requested: Arc::new(AtomicBool::new(false)),
         }
     }
 
@@ -140,8 +140,8 @@ impl SystemServiceInterface for MacOSSystemService {
         info!("Registering signal handlers for SIGTERM, SIGINT, SIGHUP");
 
         // Register SIGTERM and SIGINT to set shutdown flag
-        flag::register(SIGTERM, Arc::clone(&self.should_continue))?;
-        flag::register(SIGINT, Arc::clone(&self.should_continue))?;
+        flag::register(SIGTERM, Arc::clone(&self.shutdown_requested))?;
+        flag::register(SIGINT, Arc::clone(&self.shutdown_requested))?;
 
         // Register SIGHUP to set config reload flag
         flag::register(SIGHUP, Arc::clone(&self.config_reload_requested))?;
@@ -158,7 +158,8 @@ impl SystemServiceInterface for MacOSSystemService {
     }
 
     fn should_continue_running(&self) -> bool {
-        self.should_continue.load(Ordering::Relaxed)
+        // Continue running unless shutdown was requested
+        !self.shutdown_requested.load(Ordering::Relaxed)
     }
 
     fn sleep_ms(&self, milliseconds: u64) -> Result<()> {
