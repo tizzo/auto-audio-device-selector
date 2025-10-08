@@ -181,9 +181,10 @@ async fn main() -> Result<()> {
             apply_preferences().await?;
         }
         None => {
-            // Default behavior - run daemon if no command specified
-            info!("No command specified, running in daemon mode");
-            run_daemon(cli.config.as_deref()).await?;
+            // No command specified - print help
+            use clap::CommandFactory;
+            Cli::command().print_help()?;
+            println!(); // Add newline after help
         }
     }
 
