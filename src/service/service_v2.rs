@@ -4,6 +4,8 @@ use tracing::{error, info};
 
 use crate::audio::DeviceControllerV2;
 use crate::config::{Config, ConfigLoader};
+use crate::preference_debugging::{PreferenceChanges, PreferenceStatus};
+use crate::priority::DevicePriorityManager;
 use crate::system::{AudioSystemInterface, FileSystemInterface, SystemServiceInterface};
 
 /// Main audio device service with dependency injection for complete testability
@@ -155,6 +157,91 @@ impl<A: AudioSystemInterface, F: FileSystemInterface, S: SystemServiceInterface>
     #[allow(dead_code)]
     pub fn get_process_id(&self) -> u32 {
         self.system_service.get_process_id()
+    }
+
+    /// Check if current devices match configured preferences
+    // Called by CLI commands to verify device selection matches configuration
+    #[allow(dead_code)]
+    pub fn check_preferences(&self) -> Result<PreferenceStatus> {
+        let priority_manager = DevicePriorityManager::new(&self.config);
+        let available_devices = self.device_controller.enumerate_devices()?;
+
+        let current_output = self.device_controller.get_default_output_device()?;
+        let current_input = self.device_controller.get_default_input_device()?;
+
+        let preferred_output = priority_manager.find_best_output_device(&available_devices);
+        let preferred_input = priority_manager.find_best_input_device(&available_devices);
+
+        let output_matches = match (&current_output, &preferred_output) {
+            (Some(current), Some(preferred)) => current.name == preferred.name,
+            (None, None) => true,
+            _ => false,
+        };
+
+        let input_matches = match (&current_input, &preferred_input) {
+            (Some(current), Some(preferred)) => current.name == preferred.name,
+            (None, None) => true,
+            _ => false,
+        };
+
+        Ok(PreferenceStatus {
+            output_matches,
+            input_matches,
+            current_output: current_output.as_ref().map(|d| d.name.clone()),
+            current_input: current_input.as_ref().map(|d| d.name.clone()),
+            preferred_output: preferred_output.as_ref().map(|d| d.name.clone()),
+            preferred_input: preferred_input.as_ref().map(|d| d.name.clone()),
+            output_device_name: preferred_output.as_ref().map(|d| d.name.clone()),
+            input_device_name: preferred_input.as_ref().map(|d| d.name.clone()),
+        })
+    }
+
+    /// Apply configured preferences by switching to preferred devices
+    // Called by CLI commands to force device switching to match configuration
+    #[allow(dead_code)]
+    pub fn apply_preferences(&self) -> Result<PreferenceChanges> {
+        let priority_manager = DevicePriorityManager::new(&self.config);
+        let available_devices = self.device_controller.enumerate_devices()?;
+
+        let current_output = self.device_controller.get_default_output_device()?;
+        let current_input = self.device_controller.get_default_input_device()?;
+
+        let preferred_output = priority_manager.find_best_output_device(&available_devices);
+        let preferred_input = priority_manager.find_best_input_device(&available_devices);
+
+        let mut changes = PreferenceChanges::no_changes();
+
+        // Switch output device if needed and available
+        if let Some(ref preferred) = preferred_output {
+            let should_switch = match &current_output {
+                Some(current) => current.name != preferred.name,
+                None => true,
+            };
+
+            if should_switch {
+                self.device_controller
+                    .set_default_output_device(&preferred.name)?;
+                changes.output_changed = true;
+                changes.new_output = Some(preferred.name.clone());
+            }
+        }
+
+        // Switch input device if needed and available
+        if let Some(ref preferred) = preferred_input {
+            let should_switch = match &current_input {
+                Some(current) => current.name != preferred.name,
+                None => true,
+            };
+
+            if should_switch {
+                self.device_controller
+                    .set_default_input_device(&preferred.name)?;
+                changes.input_changed = true;
+                changes.new_input = Some(preferred.name.clone());
+            }
+        }
+
+        Ok(changes)
     }
 
     /// Check if the service should continue running

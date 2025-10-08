@@ -6,6 +6,7 @@ mod audio;
 mod config;
 mod logging;
 mod notifications;
+mod preference_debugging;
 mod priority;
 mod service;
 mod system;

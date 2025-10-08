@@ -15,8 +15,7 @@
       "Bash(git checkout:*)",
       "Bash(time cargo test --quiet)",
       "Bash(ls:*)",
-      "Bash(git stash:*)",
-      "Bash(git commit:*)"
+      "Bash(git stash push:*)"
     ],
     "deny": []
   }

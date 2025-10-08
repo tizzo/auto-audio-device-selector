@@ -1,6 +1,7 @@
 pub mod audio;
 pub mod config;
 pub mod notifications;
+pub mod preference_debugging;
 pub mod priority;
 pub mod service;
 pub mod system;
@@ -8,6 +9,7 @@ pub mod system;
 pub use audio::{AudioDevice, AudioDeviceMonitor, DeviceControllerV2, DeviceType};
 pub use config::{Config, ConfigLoader};
 pub use notifications::{DefaultNotificationManager, NotificationManager, SwitchReason};
+pub use preference_debugging::{PreferenceChanges, PreferenceStatus};
 
 #[cfg(any(test, feature = "test-mocks"))]
 pub use notifications::TestNotificationSender;
