@@ -678,8 +678,7 @@ mod edge_cases {
         assert_eq!(best_device.unwrap().name, "Device 99"); // Highest weight
         assert!(
             duration.as_millis() < 10,
-            "Selection took too long: {:?}",
-            duration
+            "Selection took too long: {duration:?}"
         );
     }
 }
