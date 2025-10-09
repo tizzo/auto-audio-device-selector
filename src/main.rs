@@ -272,7 +272,7 @@ async fn run_daemon(config_path: Option<&str>) -> Result<()> {
     // Start the service (this will block until shutdown)
     service.start()?;
 
-    println!("Daemon stopped");
+    info!("Daemon stopped");
     Ok(())
 }
 
