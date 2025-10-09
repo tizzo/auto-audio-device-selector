@@ -6,7 +6,9 @@
 #![allow(dead_code)]
 
 use audio_device_monitor::audio::{AudioDevice, DeviceType};
-use audio_device_monitor::config::{DeviceRule, MatchType};
+use audio_device_monitor::config::{
+    Config, DeviceRule, GeneralConfig, MatchType, NotificationConfig,
+};
 
 /// Builder for creating test AudioDevice instances
 pub struct AudioDeviceBuilder {
@@ -57,6 +59,16 @@ impl AudioDeviceBuilder {
 
     pub fn unavailable(mut self) -> Self {
         self.is_available = false;
+        self
+    }
+
+    pub fn device_type(mut self, device_type: DeviceType) -> Self {
+        self.device_type = device_type;
+        self
+    }
+
+    pub fn available(mut self) -> Self {
+        self.is_available = true;
         self
     }
 
@@ -112,6 +124,11 @@ impl DeviceRuleBuilder {
 
     pub fn exact_match(mut self) -> Self {
         self.match_type = MatchType::Exact;
+        self
+    }
+
+    pub fn match_type(mut self, match_type: MatchType) -> Self {
+        self.match_type = match_type;
         self
     }
 
@@ -244,5 +261,82 @@ pub mod scenarios {
                 .id("empty_name_device")
                 .build(),
         ]
+    }
+}
+
+/// Builder for creating test Config instances
+pub struct ConfigBuilder {
+    general: GeneralConfig,
+    notifications: NotificationConfig,
+    output_devices: Vec<DeviceRule>,
+    input_devices: Vec<DeviceRule>,
+}
+
+impl ConfigBuilder {
+    pub fn new() -> Self {
+        Self {
+            general: GeneralConfig {
+                check_interval_ms: 1000,
+                log_level: "info".to_string(),
+                daemon_mode: true,
+            },
+            notifications: NotificationConfig {
+                show_device_availability: true,
+                show_switching_actions: true,
+                show_device_changes: None,
+            },
+            output_devices: Vec::new(),
+            input_devices: Vec::new(),
+        }
+    }
+
+    pub fn check_interval_ms(mut self, ms: u64) -> Self {
+        self.general.check_interval_ms = ms;
+        self
+    }
+
+    pub fn log_level(mut self, level: &str) -> Self {
+        self.general.log_level = level.to_string();
+        self
+    }
+
+    pub fn daemon_mode(mut self, enabled: bool) -> Self {
+        self.general.daemon_mode = enabled;
+        self
+    }
+
+    pub fn show_device_availability(mut self, enabled: bool) -> Self {
+        self.notifications.show_device_availability = enabled;
+        self
+    }
+
+    pub fn show_switching_actions(mut self, enabled: bool) -> Self {
+        self.notifications.show_switching_actions = enabled;
+        self
+    }
+
+    pub fn add_output_device(mut self, rule: DeviceRule) -> Self {
+        self.output_devices.push(rule);
+        self
+    }
+
+    pub fn add_input_device(mut self, rule: DeviceRule) -> Self {
+        self.input_devices.push(rule);
+        self
+    }
+
+    pub fn build(self) -> Config {
+        Config {
+            general: self.general,
+            notifications: self.notifications,
+            output_devices: self.output_devices,
+            input_devices: self.input_devices,
+        }
+    }
+}
+
+impl Default for ConfigBuilder {
+    fn default() -> Self {
+        Self::new()
     }
 }
