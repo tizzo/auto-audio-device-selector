@@ -15,7 +15,12 @@
       "Bash(git checkout:*)",
       "Bash(time cargo test --quiet)",
       "Bash(ls:*)",
-      "Bash(git stash push:*)"
+      "Bash(git stash push:*)",
+      "Bash(git reset:*)",
+      "Bash(RUST_BACKTRACE=1 cargo test --test preference_debugging_tests preference_matching_tests::test_check_preferences_when_devices_match_config -- --nocapture)",
+      "Bash(git commit:*)",
+      "Bash(git stash show:*)",
+      "Bash(git apply:*)"
     ],
     "deny": []
   }
