@@ -1,6 +1,6 @@
 use anyhow::Result;
 use clap::{Parser, Subcommand};
-use tracing::{info, warn};
+use tracing::{debug, info, warn};
 
 mod audio;
 mod config;
@@ -124,11 +124,11 @@ async fn main() -> Result<()> {
 
     let _guard = initialize_logging(logging_config)?;
 
-    info!("Starting audio device monitor");
+    debug!("Starting audio device monitor");
 
     // Load configuration
     let config = Config::load(cli.config.as_deref())?;
-    info!("Configuration loaded successfully");
+    debug!("Configuration loaded successfully");
 
     // Handle commands
     match cli.command {
@@ -192,7 +192,7 @@ async fn main() -> Result<()> {
 }
 
 async fn list_devices(verbose: bool) -> Result<()> {
-    info!("Listing audio devices");
+    debug!("Listing audio devices");
 
     let controller = audio::controller::DeviceController::new()?;
     let devices = controller.enumerate_devices()?;
@@ -277,7 +277,7 @@ async fn run_daemon(config_path: Option<&str>) -> Result<()> {
 }
 
 fn check_config(config: &Config) -> Result<()> {
-    info!("Validating configuration");
+    debug!("Validating configuration");
 
     println!("Configuration validation:");
     println!("  ✓ Configuration file parsed successfully");
@@ -290,7 +290,7 @@ fn check_config(config: &Config) -> Result<()> {
 }
 
 async fn show_default_devices() -> Result<()> {
-    info!("Showing current default devices");
+    debug!("Showing current default devices");
 
     let controller = audio::controller::DeviceController::new()?;
 
@@ -312,7 +312,7 @@ async fn show_default_devices() -> Result<()> {
 }
 
 async fn switch_device(device_name: &str, is_input: bool) -> Result<()> {
-    info!(
+    debug!(
         "Manual device switch requested: {} ({})",
         device_name,
         if is_input { "input" } else { "output" }
@@ -444,7 +444,7 @@ fn test_notification() -> Result<()> {
 }
 
 async fn device_info(device_name: &str) -> Result<()> {
-    info!("Getting device information for: {}", device_name);
+    debug!("Getting device information for: {}", device_name);
 
     let controller = audio::controller::DeviceController::new()?;
     let devices = controller.enumerate_devices()?;
@@ -477,7 +477,7 @@ async fn device_info(device_name: &str) -> Result<()> {
 }
 
 async fn check_device(device_name: &str) -> Result<()> {
-    info!("Checking device availability: {}", device_name);
+    debug!("Checking device availability: {}", device_name);
 
     let controller = audio::controller::DeviceController::new()?;
 
@@ -514,7 +514,7 @@ async fn check_device(device_name: &str) -> Result<()> {
 }
 
 async fn show_status() -> Result<()> {
-    info!("Showing service status");
+    debug!("Showing service status");
 
     println!("Audio Device Monitor Status:");
     println!("============================");
@@ -545,7 +545,7 @@ async fn show_status() -> Result<()> {
 }
 
 async fn show_current_devices() -> Result<()> {
-    info!("Showing current active devices");
+    debug!("Showing current active devices");
 
     let controller = audio::controller::DeviceController::new()?;
 
@@ -572,7 +572,7 @@ async fn show_current_devices() -> Result<()> {
 }
 
 async fn check_preferences() -> Result<()> {
-    info!("Checking if current devices match configured preferences");
+    debug!("Checking if current devices match configured preferences");
 
     let _config = Config::load(None)?;
 
@@ -636,7 +636,7 @@ async fn check_preferences() -> Result<()> {
 }
 
 async fn apply_preferences() -> Result<()> {
-    info!("Applying configured device preferences");
+    debug!("Applying configured device preferences");
 
     let _config = Config::load(None)?;
 

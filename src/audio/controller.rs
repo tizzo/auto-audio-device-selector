@@ -5,7 +5,7 @@ use coreaudio_sys::*;
 // Removed cpal imports
 use std::os::raw::c_void;
 use std::ptr;
-use tracing::{debug, error, info};
+use tracing::{debug, error};
 
 use super::device::{AudioDevice, DeviceInfo, DeviceType};
 
@@ -15,7 +15,7 @@ pub struct DeviceController {
 
 impl DeviceController {
     pub fn new() -> Result<Self> {
-        info!("Initialized audio device controller with CoreAudio");
+        debug!("Initialized audio device controller with CoreAudio");
         Ok(Self {})
     }
 
@@ -97,7 +97,7 @@ impl DeviceController {
             }
         }
 
-        info!("Enumerated {} audio devices", devices.len());
+        debug!("Enumerated {} audio devices", devices.len());
         Ok(devices)
     }
 
@@ -199,7 +199,7 @@ impl DeviceController {
 
     /// Set the default output device by name
     pub fn set_default_output_device(&self, device_name: &str) -> Result<()> {
-        info!("Setting default output device to: {}", device_name);
+        debug!("Setting default output device to: {}", device_name);
 
         // Find the CoreAudio device ID by name
         if let Some(device_id) = self.find_coreaudio_device_by_name(device_name, false)? {
@@ -211,9 +211,9 @@ impl DeviceController {
         Ok(())
     }
 
-    /// Set the default input device by name  
+    /// Set the default input device by name
     pub fn set_default_input_device(&self, device_name: &str) -> Result<()> {
-        info!("Setting default input device to: {}", device_name);
+        debug!("Setting default input device to: {}", device_name);
 
         // Find the CoreAudio device ID by name
         if let Some(device_id) = self.find_coreaudio_device_by_name(device_name, true)? {
@@ -249,7 +249,7 @@ impl DeviceController {
             }
         }
 
-        info!("Successfully set default output device ID: {}", device_id);
+        debug!("Successfully set default output device ID: {}", device_id);
         Ok(())
     }
 
@@ -277,7 +277,7 @@ impl DeviceController {
             }
         }
 
-        info!("Successfully set default input device ID: {}", device_id);
+        debug!("Successfully set default input device ID: {}", device_id);
         Ok(())
     }
 

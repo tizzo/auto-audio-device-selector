@@ -1,4 +1,4 @@
-use tracing::{debug, info};
+use tracing::debug;
 
 use crate::audio::{AudioDevice, DeviceType};
 use crate::config::{Config, DeviceRule};
@@ -12,7 +12,7 @@ pub struct DevicePriorityManager {
 
 impl DevicePriorityManager {
     pub fn new(config: &Config) -> Self {
-        info!("Creating device priority manager");
+        debug!("Creating device priority manager");
 
         Self {
             output_priorities: config.output_devices.clone(),
@@ -79,7 +79,7 @@ impl DevicePriorityManager {
         }
 
         if let Some(ref device) = best_device {
-            info!(
+            debug!(
                 "Best {} device: {} (weight: {})",
                 device_type, device.name, best_weight
             );

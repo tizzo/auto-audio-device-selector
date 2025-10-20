@@ -49,7 +49,7 @@ impl<F: FileSystemInterface> ConfigLoader<F> {
         // Handle backward compatibility for notification config
         config.notifications = config.notifications.migrate_from_old_config();
 
-        info!("Configuration loaded successfully");
+        debug!("Configuration loaded successfully");
         Ok(config)
     }
 

@@ -25,7 +25,7 @@ pub struct CoreAudioListener {
 
 impl CoreAudioListener {
     pub fn new(config: &Config) -> Result<Self> {
-        info!("Creating CoreAudio listener");
+        debug!("Creating CoreAudio listener");
 
         let controller = DeviceController::new()?;
         let priority_manager = Arc::new(Mutex::new(DevicePriorityManager::new(config)));
