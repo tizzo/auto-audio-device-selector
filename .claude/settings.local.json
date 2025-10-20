@@ -20,7 +20,12 @@
       "Bash(RUST_BACKTRACE=1 cargo test --test preference_debugging_tests preference_matching_tests::test_check_preferences_when_devices_match_config -- --nocapture)",
       "Bash(git commit:*)",
       "Bash(git stash show:*)",
-      "Bash(git apply:*)"
+      "Bash(git apply:*)",
+      "Bash(kill:*)",
+      "Bash(launchctl:*)",
+      "Read(//Users/htyson/Library/LaunchAgents/**)",
+      "Bash(./target/release/audio-device-monitor:*)",
+      "Bash(cat:*)"
     ],
     "deny": []
   }
