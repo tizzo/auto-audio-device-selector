@@ -25,7 +25,8 @@
       "Bash(launchctl:*)",
       "Read(//Users/htyson/Library/LaunchAgents/**)",
       "Bash(./target/release/audio-device-monitor:*)",
-      "Bash(cat:*)"
+      "Bash(cat:*)",
+      "Read(//private/tmp/**)"
     ],
     "deny": []
   }
