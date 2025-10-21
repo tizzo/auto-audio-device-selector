@@ -120,7 +120,7 @@ async fn main() -> Result<()> {
             tracing::Level::INFO
         },
         file_output: is_daemon || !cli.no_file_logs,
-        console_output: !is_daemon || cli.verbose,
+        console_output: true,
         log_dir: cli.log_dir.as_ref().map(|d| d.into()),
         json_format: cli.json_logs,
     };
