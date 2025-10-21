@@ -26,7 +26,9 @@ impl Default for LoggingConfig {
 }
 
 /// Initialize enhanced logging with file rotation and structured output
-pub fn initialize_logging(config: LoggingConfig) -> Result<Option<WorkerGuard>> {
+///
+/// Returns a tuple of (WorkerGuard, log_dir) for optional startup message
+pub fn initialize_logging(config: LoggingConfig) -> Result<(Option<WorkerGuard>, Option<PathBuf>)> {
     let mut layers = Vec::new();
     let mut guard = None;
 
@@ -104,16 +106,7 @@ pub fn initialize_logging(config: LoggingConfig) -> Result<Option<WorkerGuard>> 
         .with(layers)
         .init();
 
-    if let Some(log_path) = log_dir {
-        tracing::info!(
-            "Logging initialized with file output: {}",
-            log_path.display()
-        );
-    } else {
-        tracing::info!("Logging initialized with console output only");
-    }
-
-    Ok(guard)
+    Ok((guard, log_dir))
 }
 
 /// Get the default log directory path

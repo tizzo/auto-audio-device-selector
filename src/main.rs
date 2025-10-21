@@ -109,6 +109,9 @@ enum Commands {
 async fn main() -> Result<()> {
     let cli = Cli::parse();
 
+    // Check if we're running in daemon mode
+    let is_daemon = matches!(cli.command, Some(Commands::Daemon));
+
     // Initialize enhanced logging
     let logging_config = LoggingConfig {
         level: if cli.verbose {
@@ -116,13 +119,22 @@ async fn main() -> Result<()> {
         } else {
             tracing::Level::INFO
         },
-        file_output: !cli.no_file_logs,
-        console_output: true,
+        file_output: is_daemon || !cli.no_file_logs,
+        console_output: !is_daemon || cli.verbose,
         log_dir: cli.log_dir.as_ref().map(|d| d.into()),
         json_format: cli.json_logs,
     };
 
-    let _guard = initialize_logging(logging_config)?;
+    let (_guard, log_dir) = initialize_logging(logging_config)?;
+
+    // Only log initialization in daemon mode
+    if is_daemon {
+        if let Some(path) = log_dir {
+            info!("Logging initialized with file output: {}", path.display());
+        } else {
+            info!("Logging initialized with console output only");
+        }
+    }
 
     debug!("Starting audio device monitor");
 
