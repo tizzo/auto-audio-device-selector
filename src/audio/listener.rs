@@ -1,10 +1,11 @@
 use anyhow::Result;
 use core_foundation::runloop::CFRunLoop;
 use coreaudio_sys::*;
+use std::collections::HashMap;
 use std::os::raw::c_void;
 use std::sync::Arc;
 use std::sync::Mutex;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use tracing::{debug, error, info, warn};
 
 use super::AudioDevice;
@@ -12,6 +13,9 @@ use super::controller::DeviceController;
 use crate::config::Config;
 use crate::notifications::{DefaultNotificationManager, SwitchReason};
 use crate::priority::DevicePriorityManager;
+
+/// Time a device must be present before we consider it stable for switching
+const DEVICE_STABILITY_THRESHOLD_MS: u64 = 750;
 
 pub struct CoreAudioListener {
     controller: DeviceController,
@@ -21,6 +25,8 @@ pub struct CoreAudioListener {
     default_output_address: AudioObjectPropertyAddress,
     default_input_address: AudioObjectPropertyAddress,
     previous_devices: Arc<Mutex<Vec<AudioDevice>>>,
+    // Track when devices first appeared to implement debouncing
+    device_appearance_times: Arc<Mutex<HashMap<String, Instant>>>,
 }
 
 impl CoreAudioListener {
@@ -53,6 +59,13 @@ impl CoreAudioListener {
         // Initialize with current devices to avoid false notifications on startup
         let initial_devices = controller.enumerate_devices().unwrap_or_default();
 
+        // Initialize appearance times for existing devices
+        let mut appearance_times = HashMap::new();
+        let now = Instant::now();
+        for device in &initial_devices {
+            appearance_times.insert(device.id.clone(), now);
+        }
+
         Ok(Self {
             controller,
             priority_manager,
@@ -61,6 +74,7 @@ impl CoreAudioListener {
             default_output_address,
             default_input_address,
             previous_devices: Arc::new(Mutex::new(initial_devices)),
+            device_appearance_times: Arc::new(Mutex::new(appearance_times)),
         })
     }
 
@@ -205,57 +219,87 @@ impl CoreAudioListener {
                     current_devices.len()
                 );
 
+                let now = Instant::now();
+
                 // Check for device connections/disconnections and send notifications
                 if let Ok(mut previous_devices) = self.previous_devices.lock() {
-                    // Find newly connected devices
-                    for device in &current_devices {
-                        if !previous_devices.iter().any(|prev| prev.uid == device.uid) {
-                            // Device was connected
-                            if let Err(e) = self.notification_manager.device_connected(device) {
-                                warn!("Failed to send device connected notification: {}", e);
+                    if let Ok(mut appearance_times) = self.device_appearance_times.lock() {
+                        // Find newly connected devices
+                        for device in &current_devices {
+                            if !previous_devices.iter().any(|prev| prev.id == device.id) {
+                                // Device was connected - record appearance time
+                                appearance_times.insert(device.id.clone(), now);
+                                info!("New device detected: {} (will debounce for {}ms)",
+                                      device.name, DEVICE_STABILITY_THRESHOLD_MS);
+
+                                if let Err(e) = self.notification_manager.device_connected(device) {
+                                    warn!("Failed to send device connected notification: {}", e);
+                                }
                             }
                         }
-                    }
 
-                    // Find disconnected devices
-                    for prev_device in &*previous_devices {
-                        if !current_devices
-                            .iter()
-                            .any(|curr| curr.uid == prev_device.uid)
-                        {
-                            // Device was disconnected
-                            if let Err(e) =
-                                self.notification_manager.device_disconnected(prev_device)
+                        // Find disconnected devices and clean up appearance times
+                        for prev_device in &*previous_devices {
+                            if !current_devices
+                                .iter()
+                                .any(|curr| curr.id == prev_device.id)
                             {
-                                warn!("Failed to send device disconnected notification: {}", e);
+                                // Device was disconnected
+                                appearance_times.remove(&prev_device.id);
+                                info!("Device disconnected: {}", prev_device.name);
+
+                                if let Err(e) =
+                                    self.notification_manager.device_disconnected(prev_device)
+                                {
+                                    warn!("Failed to send device disconnected notification: {}", e);
+                                }
                             }
                         }
-                    }
 
-                    // Update previous devices list
-                    *previous_devices = current_devices.clone();
+                        // Update previous devices list
+                        *previous_devices = current_devices.clone();
+                    }
                 }
 
                 // Check if we need to switch to a higher priority device
+                // Only consider devices that have been stable for the threshold duration
                 if let Ok(priority_manager) = self.priority_manager.lock() {
-                    let output_devices: Vec<_> = current_devices
-                        .iter()
-                        .filter(|d| matches!(d.device_type, crate::audio::DeviceType::Output))
-                        .cloned()
-                        .collect();
+                    if let Ok(appearance_times) = self.device_appearance_times.lock() {
+                        // Filter devices to only those that are stable
+                        let stable_devices: Vec<_> = current_devices
+                            .iter()
+                            .filter(|d| {
+                                appearance_times.get(&d.id)
+                                    .map(|&appeared_at| {
+                                        let elapsed = now.duration_since(appeared_at);
+                                        elapsed.as_millis() >= DEVICE_STABILITY_THRESHOLD_MS as u128
+                                    })
+                                    .unwrap_or(false)
+                            })
+                            .cloned()
+                            .collect();
 
-                    let input_devices: Vec<_> = current_devices
-                        .iter()
-                        .filter(|d| matches!(d.device_type, crate::audio::DeviceType::Input))
-                        .cloned()
-                        .collect();
+                        let stable_output_devices: Vec<_> = stable_devices
+                            .iter()
+                            .filter(|d| matches!(d.device_type, crate::audio::DeviceType::Output))
+                            .cloned()
+                            .collect();
 
-                    // Find best available devices
-                    if let Some(best_output) =
-                        priority_manager.find_best_output_device(&output_devices)
-                    {
-                        if priority_manager.should_switch_output(&best_output) {
-                            info!("Switching to output device: {}", best_output.name);
+                        let stable_input_devices: Vec<_> = stable_devices
+                            .iter()
+                            .filter(|d| matches!(d.device_type, crate::audio::DeviceType::Input))
+                            .cloned()
+                            .collect();
+
+                        debug!("Found {} stable devices out of {} total (threshold: {}ms)",
+                               stable_devices.len(), current_devices.len(), DEVICE_STABILITY_THRESHOLD_MS);
+
+                        // Find best available stable devices
+                        if let Some(best_output) =
+                            priority_manager.find_best_output_device(&stable_output_devices)
+                        {
+                            if priority_manager.should_switch_output(&best_output) {
+                                info!("Switching to stable output device: {}", best_output.name);
                             match self.controller.set_default_output_device(&best_output.name) {
                                 Ok(()) => {
                                     info!(
@@ -285,10 +329,10 @@ impl CoreAudioListener {
                     }
 
                     if let Some(best_input) =
-                        priority_manager.find_best_input_device(&input_devices)
-                    {
-                        if priority_manager.should_switch_input(&best_input) {
-                            info!("Switching to input device: {}", best_input.name);
+                        priority_manager.find_best_input_device(&stable_input_devices)
+                        {
+                            if priority_manager.should_switch_input(&best_input) {
+                                info!("Switching to stable input device: {}", best_input.name);
                             match self.controller.set_default_input_device(&best_input.name) {
                                 Ok(()) => {
                                     info!(
@@ -315,6 +359,7 @@ impl CoreAudioListener {
                                 }
                             }
                         }
+                    }
                     }
                 }
             }
