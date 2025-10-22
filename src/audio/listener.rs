@@ -17,6 +17,9 @@ use crate::priority::DevicePriorityManager;
 /// Time a device must be present before we consider it stable for switching
 const DEVICE_STABILITY_THRESHOLD_MS: u64 = 750;
 
+/// Extended stability threshold for Bluetooth devices (input/output may appear separately)
+const BLUETOOTH_DEVICE_STABILITY_THRESHOLD_MS: u64 = 1500;
+
 pub struct CoreAudioListener {
     controller: DeviceController,
     priority_manager: Arc<Mutex<DevicePriorityManager>>,
@@ -208,6 +211,24 @@ impl CoreAudioListener {
         Ok(())
     }
 
+    /// Check if a device is likely a Bluetooth device based on its name
+    fn is_likely_bluetooth_device(device_name: &str) -> bool {
+        let bluetooth_keywords = ["airpod", "bluetooth", "beats", "bose", "sony", "jabra", "jbl"];
+        let name_lower = device_name.to_lowercase();
+        bluetooth_keywords.iter().any(|keyword| name_lower.contains(keyword))
+    }
+
+    /// Check if both input and output devices exist for a given device name pattern
+    fn has_paired_input_output(devices: &[AudioDevice], device_name: &str) -> bool {
+        let has_output = devices.iter().any(|d| {
+            d.name.contains(device_name) && matches!(d.device_type, crate::audio::DeviceType::Output)
+        });
+        let has_input = devices.iter().any(|d| {
+            d.name.contains(device_name) && matches!(d.device_type, crate::audio::DeviceType::Input)
+        });
+        has_output && has_input
+    }
+
     fn handle_device_list_change(&self) {
         debug!("Device list changed");
 
@@ -266,13 +287,28 @@ impl CoreAudioListener {
                 if let Ok(priority_manager) = self.priority_manager.lock() {
                     if let Ok(appearance_times) = self.device_appearance_times.lock() {
                         // Filter devices to only those that are stable
+                        // Use extended threshold for Bluetooth devices that may have separate input/output
                         let stable_devices: Vec<_> = current_devices
                             .iter()
                             .filter(|d| {
                                 appearance_times.get(&d.id)
                                     .map(|&appeared_at| {
                                         let elapsed = now.duration_since(appeared_at);
-                                        elapsed.as_millis() >= DEVICE_STABILITY_THRESHOLD_MS as u128
+                                        let is_bluetooth = Self::is_likely_bluetooth_device(&d.name);
+                                        let threshold = if is_bluetooth {
+                                            BLUETOOTH_DEVICE_STABILITY_THRESHOLD_MS
+                                        } else {
+                                            DEVICE_STABILITY_THRESHOLD_MS
+                                        };
+
+                                        // For Bluetooth devices, also check if paired device exists
+                                        if is_bluetooth && elapsed.as_millis() >= threshold as u128 {
+                                            // Extract common name part (e.g., "AirPods Pro" from "AirPods Pro - Output")
+                                            let base_name = d.name.split('-').next().unwrap_or(&d.name).trim();
+                                            Self::has_paired_input_output(&current_devices, base_name)
+                                        } else {
+                                            elapsed.as_millis() >= threshold as u128
+                                        }
                                     })
                                     .unwrap_or(false)
                             })
@@ -291,8 +327,13 @@ impl CoreAudioListener {
                             .cloned()
                             .collect();
 
-                        debug!("Found {} stable devices out of {} total (threshold: {}ms)",
-                               stable_devices.len(), current_devices.len(), DEVICE_STABILITY_THRESHOLD_MS);
+                        let bluetooth_count = stable_devices.iter()
+                            .filter(|d| Self::is_likely_bluetooth_device(&d.name))
+                            .count();
+                        debug!("Found {} stable devices out of {} total ({} Bluetooth with {}ms threshold, {} other with {}ms threshold)",
+                               stable_devices.len(), current_devices.len(),
+                               bluetooth_count, BLUETOOTH_DEVICE_STABILITY_THRESHOLD_MS,
+                               stable_devices.len() - bluetooth_count, DEVICE_STABILITY_THRESHOLD_MS);
 
                         // Find best available stable devices
                         if let Some(best_output) =
