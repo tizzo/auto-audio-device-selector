@@ -68,6 +68,33 @@ impl CoreAudioListener {
         info!("Registering CoreAudio property listeners");
 
         unsafe {
+            // Configure CFRunLoop for CoreAudio property listeners
+            // This is critical for reliable event delivery, especially for rapid device changes
+            // Setting to NULL tells CoreAudio to manage its own thread for notifications
+            info!("Configuring CoreAudio run loop for property notifications");
+            let run_loop: *const std::ffi::c_void = std::ptr::null();
+            let run_loop_address = AudioObjectPropertyAddress {
+                mSelector: kAudioHardwarePropertyRunLoop,
+                mScope: kAudioObjectPropertyScopeGlobal,
+                mElement: kAudioObjectPropertyElementMain,
+            };
+
+            let result = AudioObjectSetPropertyData(
+                kAudioObjectSystemObject,
+                &run_loop_address,
+                0,
+                std::ptr::null(),
+                std::mem::size_of::<*const std::ffi::c_void>() as u32,
+                &run_loop as *const _ as *const std::ffi::c_void,
+            );
+
+            if result != kAudioHardwareNoError as i32 {
+                warn!("Failed to set run loop property: {}", result);
+                // Continue anyway - this is an optimization, not critical
+            } else {
+                info!("CoreAudio run loop configured successfully");
+            }
+
             // Register listener for device list changes
             let result = AudioObjectAddPropertyListener(
                 kAudioObjectSystemObject,
