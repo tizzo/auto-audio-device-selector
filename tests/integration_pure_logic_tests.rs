@@ -372,6 +372,7 @@ mod realistic_scenarios {
         let config = Config {
             general: GeneralConfig {
                 check_interval_ms: 1000,
+                poll_interval_ms: 10_000,
                 log_level: "info".to_string(),
                 daemon_mode: true,
             },

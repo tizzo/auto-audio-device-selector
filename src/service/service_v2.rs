@@ -19,6 +19,8 @@ pub struct AudioDeviceService<
     system_service: S,
     config: Config,
     last_config_modified: Option<std::time::SystemTime>,
+    last_poll_time: std::time::Instant,
+    last_known_device_ids: Vec<String>,
 }
 
 impl<A: AudioSystemInterface, F: FileSystemInterface, S: SystemServiceInterface>
@@ -40,6 +42,8 @@ impl<A: AudioSystemInterface, F: FileSystemInterface, S: SystemServiceInterface>
             system_service,
             config,
             last_config_modified: None,
+            last_poll_time: std::time::Instant::now(),
+            last_known_device_ids: Vec::new(),
         })
     }
 
@@ -72,6 +76,10 @@ impl<A: AudioSystemInterface, F: FileSystemInterface, S: SystemServiceInterface>
     /// Main service loop that handles events and monitors for changes
     fn run_main_loop(&mut self) -> Result<()> {
         info!("Entering main service loop");
+        info!(
+            "Polling interval: {}ms",
+            self.config.general.poll_interval_ms
+        );
 
         while self.system_service.should_continue_running() {
             // Run one iteration of the event loop
@@ -97,12 +105,98 @@ impl<A: AudioSystemInterface, F: FileSystemInterface, S: SystemServiceInterface>
                 error!("Error checking config reload: {}", e);
             }
 
+            // Perform periodic full device check
+            let elapsed = self.last_poll_time.elapsed();
+            let poll_interval =
+                std::time::Duration::from_millis(self.config.general.poll_interval_ms);
+
+            if elapsed >= poll_interval {
+                info!(
+                    "Performing periodic device poll ({}s elapsed)",
+                    elapsed.as_secs()
+                );
+                if let Err(e) = self.periodic_check() {
+                    error!("Error during periodic check: {}", e);
+                }
+                self.last_poll_time = std::time::Instant::now();
+            }
+
             // Sleep briefly to avoid busy waiting
             self.system_service
                 .sleep_ms(self.config.general.check_interval_ms.max(100))?;
         }
 
         info!("Main service loop exited");
+        Ok(())
+    }
+
+    /// Perform a periodic check of device state and preferences
+    /// Only applies preferences if the set of available devices has changed
+    fn periodic_check(&mut self) -> Result<()> {
+        info!("Starting periodic device check");
+
+        // Get current device state
+        let available_devices = self.device_controller.enumerate_devices()?;
+        let current_output = self.device_controller.get_default_output_device()?;
+        let current_input = self.device_controller.get_default_input_device()?;
+
+        // Create a sorted list of device IDs to detect changes
+        let mut current_device_ids: Vec<String> =
+            available_devices.iter().map(|d| d.id.clone()).collect();
+        current_device_ids.sort();
+
+        info!(
+            "Periodic check: found {} devices, current output: {:?}, current input: {:?}",
+            available_devices.len(),
+            current_output.as_ref().map(|d| &d.name),
+            current_input.as_ref().map(|d| &d.name)
+        );
+
+        // Check if the set of available devices has changed
+        let devices_changed = current_device_ids != self.last_known_device_ids;
+
+        if devices_changed {
+            info!(
+                "Periodic check: device list changed (was {} devices, now {} devices)",
+                self.last_known_device_ids.len(),
+                current_device_ids.len()
+            );
+
+            // Update the known device list
+            self.last_known_device_ids = current_device_ids;
+
+            // Check preferences and apply if needed
+            let status = self.check_preferences()?;
+
+            if !status.output_matches || !status.input_matches {
+                info!(
+                    "Periodic check: preferences don't match (output: {}, input: {})",
+                    status.output_matches, status.input_matches
+                );
+                info!("Applying preferences to match configuration");
+
+                let changes = self.apply_preferences()?;
+
+                if changes.output_changed {
+                    info!(
+                        "Periodic check switched output device to: {:?}",
+                        changes.new_output
+                    );
+                }
+
+                if changes.input_changed {
+                    info!(
+                        "Periodic check switched input device to: {:?}",
+                        changes.new_input
+                    );
+                }
+            } else {
+                info!("Periodic check: all preferences match current devices");
+            }
+        } else {
+            info!("Periodic check: no device changes detected, preserving manual device selection");
+        }
+
         Ok(())
     }
 

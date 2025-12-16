@@ -48,7 +48,8 @@ The application uses TOML configuration files located at `~/.config/audio-device
 
 ```toml
 [general]
-check_interval_ms = 1000
+check_interval_ms = 1000    # Main loop sleep interval
+poll_interval_ms = 10000    # Periodic device re-enumeration interval (default: 10s)
 log_level = "info"
 daemon_mode = true
 
@@ -190,7 +191,8 @@ tests/
 
 ## Key Features
 
-- **Real-time device monitoring**: Immediate response to audio device changes
+- **Real-time device monitoring**: Immediate response to audio device changes via CoreAudio events
+- **Periodic polling**: Configurable polling (default 10s) to catch missed device changes while preserving manual selections
 - **Priority-based switching**: Configurable weighted device preferences
 - **Background service**: Runs as daemon for continuous monitoring
 - **Comprehensive CLI**: Device management, diagnostics, and service control commands
@@ -237,6 +239,8 @@ tests/
 - Monitors `kAudioHardwarePropertyDevices` for device list changes
 - Monitors `kAudioHardwarePropertyDefaultOutputDevice` for default device changes
 - Safe wrappers around CoreAudio APIs with proper error handling
+- Periodic polling (configurable, default 10s) re-enumerates devices to catch missed events
+- Polling only triggers preference application when device list changes (preserves manual selections)
 
 ### Configuration Management
 - File system abstracted configuration loading with `ConfigLoader<F: FileSystemInterface>`

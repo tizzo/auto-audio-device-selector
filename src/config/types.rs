@@ -22,8 +22,14 @@ pub struct Config {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GeneralConfig {
     pub check_interval_ms: u64,
+    #[serde(default = "default_poll_interval_ms")]
+    pub poll_interval_ms: u64,
     pub log_level: String,
     pub daemon_mode: bool,
+}
+
+fn default_poll_interval_ms() -> u64 {
+    10_000 // 10 seconds
 }
 
 // Helper struct for deserialization that preserves field presence information
@@ -119,6 +125,7 @@ impl Default for GeneralConfig {
     fn default() -> Self {
         Self {
             check_interval_ms: 1000,
+            poll_interval_ms: default_poll_interval_ms(),
             log_level: "info".to_string(),
             daemon_mode: false,
         }
