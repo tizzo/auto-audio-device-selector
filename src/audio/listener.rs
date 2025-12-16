@@ -213,15 +213,26 @@ impl CoreAudioListener {
 
     /// Check if a device is likely a Bluetooth device based on its name
     fn is_likely_bluetooth_device(device_name: &str) -> bool {
-        let bluetooth_keywords = ["airpod", "bluetooth", "beats", "bose", "sony", "jabra", "jbl"];
+        let bluetooth_keywords = [
+            "airpod",
+            "bluetooth",
+            "beats",
+            "bose",
+            "sony",
+            "jabra",
+            "jbl",
+        ];
         let name_lower = device_name.to_lowercase();
-        bluetooth_keywords.iter().any(|keyword| name_lower.contains(keyword))
+        bluetooth_keywords
+            .iter()
+            .any(|keyword| name_lower.contains(keyword))
     }
 
     /// Check if both input and output devices exist for a given device name pattern
     fn has_paired_input_output(devices: &[AudioDevice], device_name: &str) -> bool {
         let has_output = devices.iter().any(|d| {
-            d.name.contains(device_name) && matches!(d.device_type, crate::audio::DeviceType::Output)
+            d.name.contains(device_name)
+                && matches!(d.device_type, crate::audio::DeviceType::Output)
         });
         let has_input = devices.iter().any(|d| {
             d.name.contains(device_name) && matches!(d.device_type, crate::audio::DeviceType::Input)
@@ -250,8 +261,10 @@ impl CoreAudioListener {
                             if !previous_devices.iter().any(|prev| prev.id == device.id) {
                                 // Device was connected - record appearance time
                                 appearance_times.insert(device.id.clone(), now);
-                                info!("New device detected: {} (will debounce for {}ms)",
-                                      device.name, DEVICE_STABILITY_THRESHOLD_MS);
+                                info!(
+                                    "New device detected: {} (will debounce for {}ms)",
+                                    device.name, DEVICE_STABILITY_THRESHOLD_MS
+                                );
 
                                 if let Err(e) = self.notification_manager.device_connected(device) {
                                     warn!("Failed to send device connected notification: {}", e);
@@ -261,10 +274,7 @@ impl CoreAudioListener {
 
                         // Find disconnected devices and clean up appearance times
                         for prev_device in &*previous_devices {
-                            if !current_devices
-                                .iter()
-                                .any(|curr| curr.id == prev_device.id)
-                            {
+                            if !current_devices.iter().any(|curr| curr.id == prev_device.id) {
                                 // Device was disconnected
                                 appearance_times.remove(&prev_device.id);
                                 info!("Device disconnected: {}", prev_device.name);
@@ -291,10 +301,12 @@ impl CoreAudioListener {
                         let stable_devices: Vec<_> = current_devices
                             .iter()
                             .filter(|d| {
-                                appearance_times.get(&d.id)
+                                appearance_times
+                                    .get(&d.id)
                                     .map(|&appeared_at| {
                                         let elapsed = now.duration_since(appeared_at);
-                                        let is_bluetooth = Self::is_likely_bluetooth_device(&d.name);
+                                        let is_bluetooth =
+                                            Self::is_likely_bluetooth_device(&d.name);
                                         let threshold = if is_bluetooth {
                                             BLUETOOTH_DEVICE_STABILITY_THRESHOLD_MS
                                         } else {
@@ -302,10 +314,15 @@ impl CoreAudioListener {
                                         };
 
                                         // For Bluetooth devices, also check if paired device exists
-                                        if is_bluetooth && elapsed.as_millis() >= threshold as u128 {
+                                        if is_bluetooth && elapsed.as_millis() >= threshold as u128
+                                        {
                                             // Extract common name part (e.g., "AirPods Pro" from "AirPods Pro - Output")
-                                            let base_name = d.name.split('-').next().unwrap_or(&d.name).trim();
-                                            Self::has_paired_input_output(&current_devices, base_name)
+                                            let base_name =
+                                                d.name.split('-').next().unwrap_or(&d.name).trim();
+                                            Self::has_paired_input_output(
+                                                &current_devices,
+                                                base_name,
+                                            )
                                         } else {
                                             elapsed.as_millis() >= threshold as u128
                                         }
@@ -327,13 +344,19 @@ impl CoreAudioListener {
                             .cloned()
                             .collect();
 
-                        let bluetooth_count = stable_devices.iter()
+                        let bluetooth_count = stable_devices
+                            .iter()
                             .filter(|d| Self::is_likely_bluetooth_device(&d.name))
                             .count();
-                        debug!("Found {} stable devices out of {} total ({} Bluetooth with {}ms threshold, {} other with {}ms threshold)",
-                               stable_devices.len(), current_devices.len(),
-                               bluetooth_count, BLUETOOTH_DEVICE_STABILITY_THRESHOLD_MS,
-                               stable_devices.len() - bluetooth_count, DEVICE_STABILITY_THRESHOLD_MS);
+                        debug!(
+                            "Found {} stable devices out of {} total ({} Bluetooth with {}ms threshold, {} other with {}ms threshold)",
+                            stable_devices.len(),
+                            current_devices.len(),
+                            bluetooth_count,
+                            BLUETOOTH_DEVICE_STABILITY_THRESHOLD_MS,
+                            stable_devices.len() - bluetooth_count,
+                            DEVICE_STABILITY_THRESHOLD_MS
+                        );
 
                         // Find best available stable devices
                         if let Some(best_output) =
@@ -341,66 +364,78 @@ impl CoreAudioListener {
                         {
                             if priority_manager.should_switch_output(&best_output) {
                                 info!("Switching to stable output device: {}", best_output.name);
-                            match self.controller.set_default_output_device(&best_output.name) {
-                                Ok(()) => {
-                                    info!(
-                                        "Successfully switched to output device: {}",
-                                        best_output.name
-                                    );
-                                    // Send notification for successful switch
-                                    if let Err(e) = self
-                                        .notification_manager
-                                        .device_switched(&best_output, SwitchReason::HigherPriority)
-                                    {
-                                        warn!("Failed to send device switched notification: {}", e);
+                                match self.controller.set_default_output_device(&best_output.name) {
+                                    Ok(()) => {
+                                        info!(
+                                            "Successfully switched to output device: {}",
+                                            best_output.name
+                                        );
+                                        // Send notification for successful switch
+                                        if let Err(e) = self.notification_manager.device_switched(
+                                            &best_output,
+                                            SwitchReason::HigherPriority,
+                                        ) {
+                                            warn!(
+                                                "Failed to send device switched notification: {}",
+                                                e
+                                            );
+                                        }
                                     }
-                                }
-                                Err(e) => {
-                                    error!("Failed to switch output device: {}", e);
-                                    // Send notification for failed switch
-                                    if let Err(e) = self
-                                        .notification_manager
-                                        .switch_failed(&best_output.name, &e.to_string())
-                                    {
-                                        warn!("Failed to send switch failed notification: {}", e);
+                                    Err(e) => {
+                                        error!("Failed to switch output device: {}", e);
+                                        // Send notification for failed switch
+                                        if let Err(e) = self
+                                            .notification_manager
+                                            .switch_failed(&best_output.name, &e.to_string())
+                                        {
+                                            warn!(
+                                                "Failed to send switch failed notification: {}",
+                                                e
+                                            );
+                                        }
                                     }
                                 }
                             }
                         }
-                    }
 
-                    if let Some(best_input) =
-                        priority_manager.find_best_input_device(&stable_input_devices)
+                        if let Some(best_input) =
+                            priority_manager.find_best_input_device(&stable_input_devices)
                         {
                             if priority_manager.should_switch_input(&best_input) {
                                 info!("Switching to stable input device: {}", best_input.name);
-                            match self.controller.set_default_input_device(&best_input.name) {
-                                Ok(()) => {
-                                    info!(
-                                        "Successfully switched to input device: {}",
-                                        best_input.name
-                                    );
-                                    // Send notification for successful switch
-                                    if let Err(e) = self
-                                        .notification_manager
-                                        .device_switched(&best_input, SwitchReason::HigherPriority)
-                                    {
-                                        warn!("Failed to send device switched notification: {}", e);
+                                match self.controller.set_default_input_device(&best_input.name) {
+                                    Ok(()) => {
+                                        info!(
+                                            "Successfully switched to input device: {}",
+                                            best_input.name
+                                        );
+                                        // Send notification for successful switch
+                                        if let Err(e) = self.notification_manager.device_switched(
+                                            &best_input,
+                                            SwitchReason::HigherPriority,
+                                        ) {
+                                            warn!(
+                                                "Failed to send device switched notification: {}",
+                                                e
+                                            );
+                                        }
                                     }
-                                }
-                                Err(e) => {
-                                    error!("Failed to switch input device: {}", e);
-                                    // Send notification for failed switch
-                                    if let Err(e) = self
-                                        .notification_manager
-                                        .switch_failed(&best_input.name, &e.to_string())
-                                    {
-                                        warn!("Failed to send switch failed notification: {}", e);
+                                    Err(e) => {
+                                        error!("Failed to switch input device: {}", e);
+                                        // Send notification for failed switch
+                                        if let Err(e) = self
+                                            .notification_manager
+                                            .switch_failed(&best_input.name, &e.to_string())
+                                        {
+                                            warn!(
+                                                "Failed to send switch failed notification: {}",
+                                                e
+                                            );
+                                        }
                                     }
                                 }
                             }
                         }
-                    }
                     }
                 }
             }
