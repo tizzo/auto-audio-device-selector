@@ -9,17 +9,10 @@
   "categories": ["System", "Productivity"],
   "commands": [
     {
-      "name": "switch-output",
-      "title": "Switch Output Device",
+      "name": "apply-preferences",
+      "title": "Apply Preferences",
       "subtitle": "Audio Device Selector",
-      "description": "Pick an output device to make it the default output.",
-      "mode": "view"
-    },
-    {
-      "name": "switch-input",
-      "title": "Switch Input Device",
-      "subtitle": "Audio Device Selector",
-      "description": "Pick an input device to make it the default input.",
+      "description": "Switch to your configured priority devices.",
       "mode": "view"
     },
     {
@@ -30,10 +23,17 @@
       "mode": "view"
     },
     {
-      "name": "apply-preferences",
-      "title": "Apply Preferences",
+      "name": "switch-input",
+      "title": "Switch Input Device",
       "subtitle": "Audio Device Selector",
-      "description": "Switch to your configured priority devices.",
+      "description": "Pick an input device to make it the default input.",
+      "mode": "view"
+    },
+    {
+      "name": "switch-output",
+      "title": "Switch Output Device",
+      "subtitle": "Audio Device Selector",
+      "description": "Pick an output device to make it the default output.",
       "mode": "view"
     },
     {

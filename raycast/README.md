@@ -35,10 +35,10 @@ Run `npm run build` to verify a production build.
 
 | Command | Mode | What it does |
 | --- | --- | --- |
-| **Switch Output Device** | View | Lists output devices; select one to set it as the default output. |
-| **Switch Input Device** | View | Lists input devices; select one to set it as the default input. |
-| **Show Current Devices** | View | Shows the current default output/input devices. |
 | **Apply Preferences** | View | Runs `apply-preferences` and shows what changed. |
+| **Show Current Devices** | View | Shows the current default output/input devices. |
+| **Switch Input Device** | View | Lists input devices; select one to set it as the default input. |
+| **Switch Output Device** | View | Lists output devices; select one to set it as the default output. |
 | **Audio Devices Menu Bar** | Menu bar | Menu-bar item showing the current input device with quick-switch submenus for input and output. |
 
 ### Enabling / disabling the menu bar item
