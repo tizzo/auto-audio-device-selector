@@ -169,6 +169,7 @@ audio-device-monitor [OPTIONS] [COMMAND]
 
 - `-v, --verbose` - Enable verbose logging
 - `-c, --config <CONFIG>` - Specify custom configuration file path
+- `--json` - Emit machine-readable JSON on stdout (for scripting / the Raycast extension). Supported by `list-devices`, `show-current`, `switch`, and `apply-preferences`. Console/file logging is suppressed in this mode so stdout stays parseable.
 - `--json-logs` - Enable JSON logging format (for log aggregation)
 - `--no-file-logs` - Disable file logging (console only)
 - `--log-dir <LOG_DIR>` - Custom log directory
@@ -247,6 +248,58 @@ audio-device-monitor [OPTIONS] [COMMAND]
   ```bash
   audio-device-monitor show-current
   ```
+
+## Raycast Extension
+
+A companion [Raycast](https://raycast.com) extension lives in [`raycast/`](raycast/). It
+drives this binary (via the `--json` output mode) so you can switch and inspect audio
+devices without leaving Raycast — through the Raycast window and an optional macOS
+menu-bar item.
+
+It is intentionally **not published to the Raycast Store**; it is imported locally as a
+developer extension and shared here alongside the project.
+
+### Prerequisites
+
+- [Raycast](https://raycast.com)
+- Node.js 22+ and npm
+- The `audio-device-monitor` binary on your `PATH` (see [Installation](#installation)).
+  The extension prepends `/usr/local/bin` and the Homebrew paths when spawning it, since
+  Raycast runs with a minimal environment.
+
+### Install
+
+```bash
+cd raycast
+npm install
+npm run dev      # imports the extension into Raycast and starts hot-reload
+```
+
+`npm run dev` registers the extension; the commands appear immediately under Raycast's
+**Development** section. It stays installed and usable after you stop the dev server —
+`npm run dev` only adds hot-reload while you edit. Run `npm run build` to verify a
+production build.
+
+### Commands
+
+| Command | Mode | Description |
+| --- | --- | --- |
+| **Switch Output Device** | View | Lists output devices; select one to set it as the default output. |
+| **Switch Input Device** | View | Lists input devices; select one to set it as the default input. |
+| **Show Current Devices** | View | Shows the current default output/input devices. |
+| **Apply Preferences** | View | Runs `apply-preferences` and shows what changed. |
+| **Audio Devices Menu Bar** | Menu bar | Menu-bar item showing the current input device with quick-switch submenus for input and output. |
+
+Enable or disable the menu-bar item from its command settings in Raycast (open the
+command and toggle it, or use *Configure Command*).
+
+### Preferences
+
+- **Binary Path**: path to the `audio-device-monitor` binary. Defaults to
+  `audio-device-monitor` (resolved from `PATH`); set an absolute path if Raycast can't
+  find it.
+
+See [`raycast/README.md`](raycast/README.md) for more detail.
 
 ## Service Management
 

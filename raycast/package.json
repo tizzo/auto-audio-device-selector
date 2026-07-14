@@ -1,0 +1,77 @@
+{
+  "$schema": "https://www.raycast.com/schemas/extension.json",
+  "name": "audio-device-selector",
+  "title": "Audio Device Selector",
+  "description": "Interactively switch and manage macOS audio devices via the audio-device-monitor binary.",
+  "icon": "icon.png",
+  "author": "howard",
+  "license": "MIT",
+  "categories": ["System", "Productivity"],
+  "commands": [
+    {
+      "name": "switch-output",
+      "title": "Switch Output Device",
+      "subtitle": "Audio Device Selector",
+      "description": "Pick an output device to make it the default output.",
+      "mode": "view"
+    },
+    {
+      "name": "switch-input",
+      "title": "Switch Input Device",
+      "subtitle": "Audio Device Selector",
+      "description": "Pick an input device to make it the default input.",
+      "mode": "view"
+    },
+    {
+      "name": "show-current",
+      "title": "Show Current Devices",
+      "subtitle": "Audio Device Selector",
+      "description": "Show the current default output and input devices.",
+      "mode": "view"
+    },
+    {
+      "name": "apply-preferences",
+      "title": "Apply Preferences",
+      "subtitle": "Audio Device Selector",
+      "description": "Switch to your configured priority devices.",
+      "mode": "view"
+    },
+    {
+      "name": "menu-bar",
+      "title": "Audio Devices Menu Bar",
+      "subtitle": "Audio Device Selector",
+      "description": "Show the current input device in the macOS menu bar with quick-switch for input and output. Enable/disable it from the command settings.",
+      "mode": "menu-bar",
+      "interval": "1m"
+    }
+  ],
+  "preferences": [
+    {
+      "name": "binaryPath",
+      "type": "textfield",
+      "required": false,
+      "default": "audio-device-monitor",
+      "title": "Binary Path",
+      "description": "Path to the audio-device-monitor binary. Use a bare name to resolve it from PATH, or an absolute path."
+    }
+  ],
+  "dependencies": {
+    "@raycast/api": "^1.99.0",
+    "@raycast/utils": "^1.19.0"
+  },
+  "devDependencies": {
+    "@raycast/eslint-config": "^2.0.4",
+    "@types/node": "^22.13.0",
+    "@types/react": "^19.0.0",
+    "eslint": "^9.22.0",
+    "prettier": "^3.5.3",
+    "typescript": "^5.8.2"
+  },
+  "scripts": {
+    "build": "ray build",
+    "dev": "ray develop",
+    "fix-lint": "ray lint --fix",
+    "lint": "ray lint",
+    "publish": "npx @raycast/api@latest publish"
+  }
+}
