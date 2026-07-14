@@ -37,6 +37,10 @@ struct Cli {
     #[arg(long)]
     json_logs: bool,
 
+    /// Emit machine-readable JSON output (for scripting / Raycast integration)
+    #[arg(long, global = true)]
+    json: bool,
+
     /// Disable file logging (console only)
     #[arg(long)]
     no_file_logs: bool,
@@ -119,8 +123,10 @@ async fn main() -> Result<()> {
         } else {
             tracing::Level::INFO
         },
-        file_output: is_daemon || !cli.no_file_logs,
-        console_output: true,
+        // In --json mode, keep stdout clean (logs would corrupt the JSON) and
+        // avoid spamming log files on every scripted/Raycast invocation.
+        file_output: is_daemon || (!cli.no_file_logs && !cli.json),
+        console_output: !cli.json,
         log_dir: cli.log_dir.as_ref().map(|d| d.into()),
         json_format: cli.json_logs,
     };
@@ -145,7 +151,7 @@ async fn main() -> Result<()> {
     // Handle commands
     match cli.command {
         Some(Commands::ListDevices { verbose }) => {
-            list_devices(verbose).await?;
+            list_devices(verbose, cli.json).await?;
         }
         Some(Commands::TestMonitor) => {
             test_monitor().await?;
@@ -160,7 +166,7 @@ async fn main() -> Result<()> {
             show_default_devices().await?;
         }
         Some(Commands::Switch { device, input }) => {
-            switch_device(&device, input).await?;
+            switch_device(&device, input, cli.json).await?;
         }
         Some(Commands::InstallService) => {
             install_service()?;
@@ -184,13 +190,13 @@ async fn main() -> Result<()> {
             show_status().await?;
         }
         Some(Commands::ShowCurrent) => {
-            show_current_devices().await?;
+            show_current_devices(cli.json).await?;
         }
         Some(Commands::CheckPreferences) => {
             check_preferences().await?;
         }
         Some(Commands::ApplyPreferences) => {
-            apply_preferences().await?;
+            apply_preferences(cli.json).await?;
         }
         None => {
             // No command specified - print help
@@ -203,11 +209,54 @@ async fn main() -> Result<()> {
     Ok(())
 }
 
-async fn list_devices(verbose: bool) -> Result<()> {
+async fn list_devices(verbose: bool, json: bool) -> Result<()> {
     debug!("Listing audio devices");
 
     let controller = audio::controller::DeviceController::new()?;
     let devices = controller.enumerate_devices()?;
+
+    if json {
+        // enumerate_devices() does not populate is_default, so resolve the
+        // current defaults separately and mark each entry accordingly.
+        let default_output = controller
+            .get_default_output_device()
+            .ok()
+            .flatten()
+            .map(|d| d.name);
+        let default_input = controller
+            .get_default_input_device()
+            .ok()
+            .flatten()
+            .map(|d| d.name);
+
+        let items: Vec<_> = devices
+            .iter()
+            .map(|d| {
+                let type_str = d.device_type.to_string();
+                let is_default = if type_str == "Input" {
+                    Some(&d.name) == default_input.as_ref()
+                } else {
+                    Some(&d.name) == default_output.as_ref()
+                };
+                serde_json::json!({
+                    "id": d.id,
+                    "name": d.name,
+                    "type": type_str,
+                    "is_default": is_default,
+                    "is_available": d.is_available,
+                    "uid": d.uid,
+                })
+            })
+            .collect();
+
+        let out = serde_json::json!({
+            "devices": items,
+            "default_output": default_output,
+            "default_input": default_input,
+        });
+        println!("{}", serde_json::to_string_pretty(&out)?);
+        return Ok(());
+    }
 
     println!("Available audio devices:");
     if devices.is_empty() {
@@ -323,7 +372,7 @@ async fn show_default_devices() -> Result<()> {
     Ok(())
 }
 
-async fn switch_device(device_name: &str, is_input: bool) -> Result<()> {
+async fn switch_device(device_name: &str, is_input: bool, json: bool) -> Result<()> {
     debug!(
         "Manual device switch requested: {} ({})",
         device_name,
@@ -334,11 +383,13 @@ async fn switch_device(device_name: &str, is_input: bool) -> Result<()> {
     let config = Config::load(None)?;
     let notification_manager = DefaultNotificationManager::new(&config);
 
-    println!(
-        "Switching {} device to: {}",
-        if is_input { "input" } else { "output" },
-        device_name
-    );
+    if !json {
+        println!(
+            "Switching {} device to: {}",
+            if is_input { "input" } else { "output" },
+            device_name
+        );
+    }
 
     let result = if is_input {
         controller.set_default_input_device(device_name)
@@ -348,12 +399,6 @@ async fn switch_device(device_name: &str, is_input: bool) -> Result<()> {
 
     match result {
         Ok(()) => {
-            println!(
-                "✓ Successfully switched {} device to: {}",
-                if is_input { "input" } else { "output" },
-                device_name
-            );
-
             // Send manual switch notification
             if let Ok(devices) = controller.enumerate_devices() {
                 if let Some(device) = devices.iter().find(|d| d.name == device_name) {
@@ -364,10 +409,25 @@ async fn switch_device(device_name: &str, is_input: bool) -> Result<()> {
                     }
                 }
             }
+
+            if json {
+                println!(
+                    "{}",
+                    serde_json::json!({
+                        "success": true,
+                        "device": device_name,
+                        "is_input": is_input,
+                    })
+                );
+            } else {
+                println!(
+                    "✓ Successfully switched {} device to: {}",
+                    if is_input { "input" } else { "output" },
+                    device_name
+                );
+            }
         }
         Err(e) => {
-            println!("✗ Failed to switch device: {e}");
-
             // Send switch failed notification
             if let Err(notification_err) =
                 notification_manager.switch_failed(device_name, &e.to_string())
@@ -378,6 +438,22 @@ async fn switch_device(device_name: &str, is_input: bool) -> Result<()> {
                 );
             }
 
+            if json {
+                // Report failure as structured output and exit successfully so
+                // callers parse the `success` field rather than a crash.
+                println!(
+                    "{}",
+                    serde_json::json!({
+                        "success": false,
+                        "device": device_name,
+                        "is_input": is_input,
+                        "error": e.to_string(),
+                    })
+                );
+                return Ok(());
+            }
+
+            println!("✗ Failed to switch device: {e}");
             return Err(e);
         }
     }
@@ -556,10 +632,29 @@ async fn show_status() -> Result<()> {
     Ok(())
 }
 
-async fn show_current_devices() -> Result<()> {
+async fn show_current_devices(json: bool) -> Result<()> {
     debug!("Showing current active devices");
 
     let controller = audio::controller::DeviceController::new()?;
+
+    if json {
+        let output = controller.get_default_output_device().ok().flatten();
+        let input = controller.get_default_input_device().ok().flatten();
+        let to_json = |d: &audio::device::AudioDevice| {
+            serde_json::json!({
+                "name": d.name,
+                "id": d.id,
+                "type": d.device_type.to_string(),
+                "uid": d.uid,
+            })
+        };
+        let out = serde_json::json!({
+            "output": output.as_ref().map(to_json),
+            "input": input.as_ref().map(to_json),
+        });
+        println!("{}", serde_json::to_string_pretty(&out)?);
+        return Ok(());
+    }
 
     println!("Current Active Devices:");
     println!("======================");
@@ -647,7 +742,7 @@ async fn check_preferences() -> Result<()> {
     Ok(())
 }
 
-async fn apply_preferences() -> Result<()> {
+async fn apply_preferences(json: bool) -> Result<()> {
     debug!("Applying configured device preferences");
 
     let _config = Config::load(None)?;
@@ -655,6 +750,17 @@ async fn apply_preferences() -> Result<()> {
     // Use the default config path for the service
     let service = service::AudioDeviceService::new_with_default_config()?;
     let changes = service.apply_preferences()?;
+
+    if json {
+        let out = serde_json::json!({
+            "output_changed": changes.output_changed,
+            "new_output": changes.new_output,
+            "input_changed": changes.input_changed,
+            "new_input": changes.new_input,
+        });
+        println!("{}", serde_json::to_string_pretty(&out)?);
+        return Ok(());
+    }
 
     if !changes.output_changed && !changes.input_changed {
         println!("🎯 All devices already match your configured preferences!");

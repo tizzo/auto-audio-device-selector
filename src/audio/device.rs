@@ -8,7 +8,7 @@ pub enum DeviceType {
     InputOutput,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AudioDevice {
     #[allow(dead_code)]
     pub id: String,
