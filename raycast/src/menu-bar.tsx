@@ -1,17 +1,26 @@
 import { Color, Icon, MenuBarExtra, showHUD } from "@raycast/api";
 import { usePromise } from "@raycast/utils";
+import { useEffect, useState } from "react";
 
 import {
   applyPreferences,
   Device,
   listDevices,
+  refreshMenuBar,
   switchDevice,
 } from "./lib/audio";
 
 export default function Command() {
   // Visibility is controlled by Raycast's native command enable/disable
   // setting, so the component just always renders the item while enabled.
-  const { data, isLoading } = usePromise(listDevices);
+  const { data, isLoading, revalidate } = usePromise(listDevices);
+
+  // Show the refresh status inside the dropdown (rather than a floating HUD):
+  // record when the device list was last (re)loaded.
+  const [refreshedAt, setRefreshedAt] = useState<string>();
+  useEffect(() => {
+    if (data) setRefreshedAt(new Date().toLocaleTimeString());
+  }, [data]);
 
   const outputs = (data?.devices ?? []).filter((d) => d.type === "Output");
   const inputs = (data?.devices ?? []).filter((d) => d.type === "Input");
@@ -28,6 +37,8 @@ export default function Command() {
       );
     } catch (err) {
       await showHUD(`✗ ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      await refreshMenuBar();
     }
   }
 
@@ -46,6 +57,8 @@ export default function Command() {
       );
     } catch (err) {
       await showHUD(`✗ ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      await refreshMenuBar();
     }
   }
 
@@ -84,6 +97,12 @@ export default function Command() {
           title="Apply Preferences"
           icon={Icon.Stars}
           onAction={onApplyPreferences}
+        />
+        <MenuBarExtra.Item
+          title="Refresh"
+          subtitle={refreshedAt ? `Updated ${refreshedAt}` : "Updating…"}
+          icon={Icon.ArrowClockwise}
+          onAction={() => revalidate()}
         />
       </MenuBarExtra.Section>
     </MenuBarExtra>

@@ -42,7 +42,7 @@
       "subtitle": "Audio Device Selector",
       "description": "Show the current input device in the macOS menu bar with quick-switch for input and output. Enable/disable it from the command settings.",
       "mode": "menu-bar",
-      "interval": "1m"
+      "interval": "10s"
     }
   ],
   "preferences": [

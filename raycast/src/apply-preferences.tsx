@@ -1,10 +1,17 @@
 import { Action, ActionPanel, Detail, Icon, Keyboard } from "@raycast/api";
 import { usePromise } from "@raycast/utils";
 
-import { applyPreferences } from "./lib/audio";
+import { applyPreferences, refreshMenuBar } from "./lib/audio";
 
 export default function Command() {
-  const { data, isLoading, error, revalidate } = usePromise(applyPreferences);
+  const { data, isLoading, error, revalidate } = usePromise(
+    applyPreferences,
+    [],
+    {
+      // True up the menu-bar item as soon as preferences have been applied.
+      onData: () => refreshMenuBar(),
+    },
+  );
 
   let markdown: string;
   if (error) {

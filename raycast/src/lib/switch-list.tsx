@@ -9,7 +9,7 @@ import {
   Toast,
 } from "@raycast/api";
 import { usePromise } from "@raycast/utils";
-import { Device, listDevices, switchDevice } from "./audio";
+import { Device, listDevices, refreshMenuBar, switchDevice } from "./audio";
 
 interface SwitchListProps {
   /** Which side to switch: input devices or output devices. */
@@ -44,6 +44,7 @@ export function SwitchList({ kind }: SwitchListProps) {
       toast.message = err instanceof Error ? err.message : String(err);
     } finally {
       await revalidate();
+      await refreshMenuBar();
     }
   }
 

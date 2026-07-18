@@ -47,6 +47,12 @@ Toggle the menu-bar item from its command settings in Raycast (find the *Audio D
 Menu Bar* command and enable/disable it, or use *Configure Command*). This is Raycast's
 native mechanism for menu-bar commands.
 
+The menu-bar item refreshes on its own interval (every 10s), and the other commands
+(*Apply Preferences*, *Switch Input/Output Device*, and the menu-bar quick-switch
+submenus) also trigger an immediate background refresh so the displayed device stays in
+sync right after a change. The menu also exposes a manual **Refresh** action showing when
+the device list was last updated.
+
 ## Preferences
 
 - **Binary Path** (extension): path to the `audio-device-monitor` binary. Defaults to

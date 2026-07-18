@@ -1,8 +1,21 @@
-import { getPreferenceValues } from "@raycast/api";
+import { getPreferenceValues, launchCommand, LaunchType } from "@raycast/api";
 import { execFile } from "child_process";
 import { promisify } from "util";
 
 const execFileP = promisify(execFile);
+
+/**
+ * Ask Raycast to re-run the menu-bar command in the background so it reflects a
+ * device change immediately instead of waiting for the next interval tick.
+ * Safe to call from any command; a no-op if the menu-bar command is disabled.
+ */
+export async function refreshMenuBar(): Promise<void> {
+  try {
+    await launchCommand({ name: "menu-bar", type: LaunchType.Background });
+  } catch {
+    // Menu-bar command disabled or otherwise unavailable — nothing to refresh.
+  }
+}
 
 /** Directories prepended to PATH so a bare binary name resolves under Raycast's
  * minimal environment (it does not inherit your login shell PATH). */
